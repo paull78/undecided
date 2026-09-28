@@ -3,9 +3,9 @@
 A small, open reproduction of the idea behind Jev: a classifier that never generates text and
 instead returns probabilities over options you choose at request time. This version is built on
 [ModernBERT-base](https://huggingface.co/answerdotai/ModernBERT-base) (149M parameters) with a
-linear head that scores each option, and it is fine-tuned on a laptop GPU in under an hour.
+linear head that scores each option, and it is sized to be fine-tuned on a laptop GPU.
 
-> **Status:** plan. Nothing below is implemented yet, and the results tables are empty on
+> **Status:** plan. Nothing below is implemented yet, and the results table is empty on
 > purpose. This is a case study: the goal is a working proof of concept with honest numbers.
 >
 > Not affiliated with TypeSafe. "Jev" refers to their product and is used here only to
@@ -44,7 +44,7 @@ The case study answers five questions:
 
 1. How much of that zero-shot behaviour does a 149M-parameter encoder fine-tuned on public
    classification datasets actually get?
-2. How well does it do on labels, and on a whole task type, it never saw during training?
+2. How well does it handle labels it never saw in training, and a task type it never saw?
 3. Are its probabilities calibrated, and does a single global fix (temperature scaling) help
    on new datasets, or does it need target data, as the Molas post predicts?
 4. How fast is it on a laptop, and how does latency grow with the number of options?
@@ -76,12 +76,10 @@ flowchart LR
     S --> P["probabilities"]
 ```
 
-The encoder reads everything at once, so each `<opt>` position can attend to the instruction,
-to the text and to the other options. The hidden state at that position becomes a summary of
-"how well does this option fit this text". A single `Linear(768, 1)` turns each summary into a
-logit, and a softmax across the options of that example turns logits into probabilities.
-The same head is shared by every option, which is why the number and names of options can
-change at runtime.
+The encoder reads the whole sequence, a single `Linear(768, 1)` scores the hidden state at each
+`<opt>` token, and a softmax across the options of that example turns the scores into
+probabilities. [Why this design](#why-this-design) explains how that works and why the options
+can change at runtime.
 
 The whole model is a few lines on top of `transformers`:
 
@@ -111,13 +109,13 @@ Training loss is plain cross-entropy between these logits and the index of the c
 ### Why this design
 
 A head is the small layer on top of the encoder that turns its output into an answer. The
-designs below differ in where the label names live, and that decides whether options can
-change at runtime.
+three common designs differ in where the label names live, and that decides whether options
+can change at runtime.
 
 | Design | Options at runtime | Cost per request | Used by |
 |---|---|---|---|
 | Fixed head, `Linear(768, N)` | No, the N classes are frozen at training time | 1 pass | Classic fine-tuned BERT |
-| Cross-encoder / NLI, one pass per option | Yes | N passes | `ModernBERT-base-zeroshot-v2.0`, most zero-shot pipelines |
+| Natural-language inference (NLI), one pass per option | Yes | N passes | `ModernBERT-base-zeroshot-v2.0`, most zero-shot pipelines |
 | **Packed options, per-option head** | Yes | 1 pass | This project, GLiClass |
 
 #### Fixed head: labels live in the weights
@@ -148,21 +146,31 @@ So at request time:
 Passing the options with every request, including options nobody trained on, is the point of
 Jev. A fixed head can't do it, so a fixed head can't be a Jev clone.
 
-#### Packed options: labels live in the input
+#### One pass per option: labels live in the input, one at a time
+
+NLI-based zero-shot models read labels as text, but they run the encoder once per option:
+"My card was charged twice" paired with "This is about billing" gives a yes/no score, then the
+same again for every other option. That handles new labels, with two drawbacks:
+
+- 60 options cost 60 forward passes.
+- Each option is scored alone, so the model never learns to weigh one option against another,
+  and the probabilities aren't trained as a real distribution.
+
+#### Packed options: labels live in the input, all together
 
 ```text
-[CLS] Classify the ticket. [SEP] <opt> billing <opt> bug report <opt> praise [SEP] My card was charged twice. [SEP]
-                                   │               │                 │
+[CLS] Classify the support ticket. [SEP] <opt> billing <opt> bug report <opt> praise [SEP] My card was charged twice. [SEP]
+                                         │             │                │
                               the encoder reads everything together, with attention
-                                   │               │                 │
-                              vector at        vector at         vector at
-                              1st <opt>        2nd <opt>         3rd <opt>
-                                   │               │                 │
-                              Linear(768, 1), the same layer applied to each
-                                   │               │                 │
-                                  2.9            -0.4              -1.8      one score per option
-                                   └─────────── softmax ─────────────┘
-                                  0.91            0.07              0.02     (illustrative numbers)
+                                         │             │                │
+                                     vector at     vector at        vector at
+                                     1st <opt>     2nd <opt>        3rd <opt>
+                                         │             │                │
+                                 Linear(768, 1), the same layer applied to each
+                                         │             │                │
+                                        2.9          -0.4             -1.8      one score per option
+                                         └────────── softmax ───────────┘
+                                       0.91          0.07             0.02     (illustrative numbers)
 ```
 
 1. **The head has one output.** `Linear(768, 1)` answers a single, generic question: how well
@@ -177,6 +185,9 @@ Jev. A fixed head can't do it, so a fixed head can't be a Jev clone.
    means "billing beats the other two options it was given". Different options give a different
    distribution, which matches how Jev behaves.
 
+Compared with one pass per option, packing keeps a single forward pass however many options
+there are, and the softmax is trained over the options that actually compete.
+
 #### Why unseen labels can work
 
 Training shows the model many (text, option set, correct option) triples from different
@@ -185,33 +196,56 @@ a text to a label description, since memorising 77 banking intents doesn't help 
 datasets. At test time, "alarm set" or "irony" are words it reads, like the text. The held-out
 datasets check whether that skill actually transfers.
 
-#### One pass per option
-
-Zero-shot models built on natural-language inference (NLI) also read labels as text, but they
-run the encoder once per option: "My card was charged twice" paired with "This is about
-billing" gives a yes/no score, then the same again for every other option. That handles new
-labels, with two drawbacks:
-
-- 60 options cost 60 forward passes, against 1 for packed options.
-- Each option is scored alone, so the model never learns to weigh one option against another,
-  and the probabilities aren't trained as a real distribution.
-
-Packing all options into one sequence keeps a single pass, and the softmax is trained over the
-actual competing options.
-
 #### What packing costs
 
 - **Position bias.** Options can see each other and their order, so the model may learn "the
   first option is usually right". Training shuffles the option order every time, and the
-  evaluation measures accuracy by the gold option's position.
+  evaluation measures accuracy by the correct option's position.
 - **Context budget.** Every option costs tokens. 60 short intent labels take a few hundred
   tokens, which fits easily in ModernBERT's 8,192-token context, but very long option
   descriptions would not scale.
 
-### New token initialisation
+### Backbone choice
 
-`<opt>` is added to the tokeniser and its embedding starts as the mean of the existing token
-embeddings. That gives the model a neutral starting point and keeps early training stable.
+The backbone is ModernBERT-base, an encoder. It fits this project for four reasons:
+
+- **Bidirectional attention.** An encoder reads the whole input in both directions at once, so
+  every `<opt>` token sees the text, the instruction and the other options, wherever they sit
+  in the sequence. A decoder LLM reads left to right, so an option could only see what comes
+  before it, and the input would need careful ordering to compensate.
+- **Size.** 149M parameters keeps inference fast and makes a full fine-tune on a laptop
+  practical, which in turn makes the ablations affordable. Single-pass speed is also the
+  property Jev is sold on.
+- **ModernBERT over older BERTs.** The 8,192-token context (classic BERT and DeBERTa stop at
+  512) fits 60 or more options in one sequence. It also has a more recent tokeniser, more
+  pretraining data and faster inference.
+- **Prior art.** GLiClass and the zero-shot v2.0 models already use ModernBERT for zero-shot
+  classification, and sharing the backbone with those baselines means the comparison isolates
+  the architecture.
+
+The expected weakness is instruction following and world knowledge. A 149M encoder should do
+well at matching a text to a set of labels and poorly at conditional rules such as "mark it
+urgent only if the customer mentions a deadline, otherwise normal". That matches the published
+Jev comparisons, where fine-tuned local classifiers won on accuracy and Jev won on runtime
+instructions. The "no instructions" ablation measures how much the model actually uses the
+instruction.
+
+Alternatives, if the results call for them:
+
+| Backbone | Better when | Cost |
+|---|---|---|
+| **ModernBERT-base** (default) | Proof of concept, speed, local training | |
+| [ModernBERT-large](https://huggingface.co/answerdotai/ModernBERT-large) (395M) | Accuracy falls short with base | Roughly 2 to 3 times slower, still fits in 48 GB |
+| [DeBERTa-v3-base](https://huggingface.co/microsoft/deberta-v3-base) | Often slightly stronger on NLI-style tasks | 512-token limit, slower, awkward in fp16 |
+| [mmBERT-base](https://huggingface.co/jhu-clsp/mmBERT-base) | Non-English text; ModernBERT is English and code only | Similar size |
+| Small decoder LLM (0.5B to 1.5B), same per-option head | Instruction following matters more than speed | Several times slower, harder to train locally, needs the left-to-right workaround |
+
+Swapping the backbone is a one-line config change, so the proof of concept starts with base
+and revisits the choice at milestone 6. New encoders keep appearing, so the list above is worth
+checking again at that point.
+
+The bigger risk to the result is the training data. If every instruction comes from a small set
+of simple templates, a larger backbone won't learn to follow unusual ones either.
 
 ## Data
 
@@ -251,15 +285,16 @@ versions of `datasets` no longer run, so the parquet and JSONL mirrors above are
 | [`SetFit/amazon_massive_intent_en-US`](https://huggingface.co/datasets/SetFit/amazon_massive_intent_en-US) | assistant intent | 60 | new labels, far more options than seen in training |
 | [`cardiffnlp/tweet_eval`](https://huggingface.co/datasets/cardiffnlp/tweet_eval) (`irony`) | irony detection | 2 | a task type absent from training |
 
-The held-out split is the core of the case study. In-distribution accuracy only shows that the
-model learned its training data; accuracy on these three shows whether it learned to classify.
+The held-out datasets are the core of the case study. In-distribution accuracy only shows that
+the model learned its training data; accuracy on these three shows whether it learned to
+classify.
 
 ### Augmentation
 
 Each training example is rebuilt on the fly, so every epoch sees different variants:
 
-- **Option sampling.** 2 to 16 options per example: the gold label plus distractors drawn from
-  the same dataset's other labels. Small label sets (sentiment, NLI) always use all labels.
+- **Option sampling.** 2 to 16 options per example: the correct label plus distractors drawn
+  from the same dataset's other labels. Small label sets (sentiment, NLI) always use all labels.
 - **Shuffling.** Option order is random every time.
 - **Label verbalisation.** Raw labels become readable phrases: `alarm_set` becomes "alarm set",
   TREC's `DESC:manner` uses its shipped name "manner of an action". A few labels per dataset
@@ -270,16 +305,20 @@ Each training example is rebuilt on the fly, so every epoch sees different varia
   large ones, MNLI and AG News, don't drown out the rest.
 
 Out of scope for the proof of concept: multi-label examples (sigmoid instead of softmax), and
-synthetic instruction-heavy data generated with an LLM. Both are natural next steps.
+synthetic instruction-heavy data generated with an LLM.
 
 ## Training
 
 ### What gets trained
 
 The **whole model**: all 149M encoder parameters plus the head. Training only the head can't
-work for this design. `<opt>` is a new token the pretrained encoder knows nothing about, and
-comparing an option with a text requires the encoder's attention to change. A linear layer on
-top of frozen features has nothing to compare. The ablations below measure this directly.
+work for this design, for the reason given in [Packed options](#packed-options-labels-live-in-the-input-all-together):
+the comparison between option and text happens inside the encoder. The head-only ablation
+measures this directly.
+
+`<opt>` is a new token, so it is added to the tokeniser and its embedding starts as the mean of
+the existing token embeddings. That gives the model a neutral starting point and keeps early
+training stable.
 
 Two learning rates keep the pretrained weights safe while the new parts catch up:
 
@@ -316,8 +355,8 @@ matter on MPS:
   slower but correct.
 - fp32 first. Mixed precision on MPS can still produce NaNs with some operations.
 
-The rough estimate is 30 to 90 minutes per run. That number is a guess until the first
-milestone measures real throughput with a 200-step benchmark.
+The rough estimate is 30 to 90 minutes per run. That number is a guess until milestone 0
+measures real throughput with a 200-step benchmark.
 
 The code picks `cuda`, `mps` or `cpu` automatically, so the same script runs unchanged in the
 cloud.
@@ -343,18 +382,18 @@ Expected cost of the full run: $2 to $5 per run, under $20 with a few iterations
 | Metric | What it answers |
 |---|---|
 | Accuracy, macro-F1 | Does it pick the right option? Macro-F1 stops frequent classes from hiding failures on rare ones. |
-| Expected Calibration Error (15 bins), Brier score, log loss | When it says 80%, is it right 80% of the time? |
+| Expected calibration error (ECE, 15 bins), Brier score, log loss | When it says 80%, is it right 80% of the time? |
 | Reliability diagrams | The same question as a picture, one per dataset |
-| Latency p50 / p95 at 2, 10 and 60 options | Batch size 1, on MPS and on CPU |
-| Accuracy by gold position | Position bias: is the first option favoured? |
+| Latency p50 / p95 at 2, 10 and 60 options | How long does one request take? Batch size 1, on MPS and on CPU. |
+| Accuracy by correct-option position | Position bias: is the first option favoured? |
 
 Every metric is reported separately for three groups: training datasets (validation splits),
 held-out datasets with new labels, and the held-out task type (irony).
 
 ### The calibration experiment
 
-This one engages directly with the Jev calibration debate. Temperature scaling divides all
-logits by one learned number T, and it is fitted in two ways:
+This experiment tests the calibration dispute described in [What Jev does](#what-jev-does).
+Temperature scaling divides all logits by one learned number T, and it is fitted in two ways:
 
 1. **Global T**, fitted once on the training datasets' validation splits, then applied
    unchanged to the held-out datasets. This is what a zero-shot model can do on its own.
@@ -369,18 +408,19 @@ per-dataset T works, the Molas argument holds for this model too.
 | Model | Why |
 |---|---|
 | Random, majority class | the floor |
-| [`MoritzLaurer/ModernBERT-base-zeroshot-v2.0`](https://huggingface.co/MoritzLaurer/ModernBERT-base-zeroshot-v2.0) | same backbone, NLI approach with one pass per option: isolates the effect of the architecture |
+| [`MoritzLaurer/ModernBERT-base-zeroshot-v2.0`](https://huggingface.co/MoritzLaurer/ModernBERT-base-zeroshot-v2.0) | same backbone, one pass per option: isolates the effect of the architecture |
 | [`MoritzLaurer/deberta-v3-base-zeroshot-v2.0`](https://huggingface.co/MoritzLaurer/deberta-v3-base-zeroshot-v2.0) | a widely used zero-shot baseline |
 | [`knowledgator/gliclass-modern-base-v2.0-init`](https://huggingface.co/knowledgator/gliclass-modern-base-v2.0-init) | closest prior art: ModernBERT with packed options |
 | Jev | optional, only if API access is available |
 
 ### Ablations
 
-Each is one extra training run, which is cheap when a run takes under an hour.
+Each is one extra training run, which stays cheap at the expected 30 to 90 minutes per local
+run.
 
 | Ablation | Question |
 |---|---|
-| Head only vs LoRA vs full fine-tune | How much of the result comes from adapting the encoder? |
+| Head only vs LoRA (small trainable adapters on a frozen encoder) vs full fine-tune | How much of the result comes from adapting the encoder? |
 | Option shuffling off | How strong is position bias without it? |
 | Max options at training time, 4 vs 16 | Does training on few options hurt on MASSIVE's 60? |
 | No instructions | Do instructions help, or does the model ignore them? |
@@ -388,7 +428,7 @@ Each is one extra training run, which is cheap when a run takes under an hour.
 
 ## Results
 
-To be filled in.
+To be filled in. The remaining ablations get a table of their own.
 
 | Model | In-distribution acc. | Held-out acc. | Unseen task acc. | ECE (held-out) | p50 latency, 10 options |
 |---|---|---|---|---|---|
@@ -398,6 +438,7 @@ To be filled in.
 | **undecided (full fine-tune)** | | | | | |
 | undecided (head only) | | | | | |
 | undecided (LoRA) | | | | | |
+| undecided (full run, cloud) | | | | | |
 
 ## Planned usage
 
@@ -450,8 +491,10 @@ Each milestone has an exit check, so progress is visible and a broken step is ca
 - [ ] **4. Evaluation.** Metrics, reliability diagrams, calibration experiment, latency,
       baselines. *Exit:* the results table is filled in for the proof of concept.
 - [ ] **5. Ablations.** Head only, LoRA, no shuffling, option count, no instructions, option
-      pooling.
-- [ ] **6. Optional full run.** Same code with `configs/full.yaml` on a rented GPU.
+      pooling. *Exit:* every ablation has filled-in results, including the ones that
+      change nothing.
+- [ ] **6. Optional full run.** Same code with `configs/full.yaml` on a rented GPU, and a
+      second look at the backbone. *Exit:* the full-run row in the results table.
 - [ ] **7. Write-up.** Replace the plan sections of this README with what actually happened,
       including what didn't work.
 
@@ -463,9 +506,11 @@ more options. Matching Jev isn't a goal.
 
 - It shares Jev's interface and none of TypeSafe's methods, RL-CD included.
 - English only.
+- Complex, conditional instructions are likely beyond a 149M encoder. See
+  [Backbone choice](#backbone-choice).
 - Single-label only in the proof of concept.
-- The number of options is bounded by the context length and by how many options the model saw
-  during training.
+- The number of options is bounded by the context length, and accuracy may drop with more
+  options than the 16 seen in training.
 - Dataset licences differ. Check each one before publishing trained weights.
 
 ## References
