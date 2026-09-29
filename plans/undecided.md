@@ -8,8 +8,9 @@
 | Phase | Status | Commit |
 |---|---|---|
 | 1. Tracer bullet | done 2026-09-29: tracer accuracy 0.863, 27.5 examples/s on MPS | `7152d57` |
-| 2. `classify()` on any checkpoint | next | |
-| 3 to 11 | not started | |
+| 2. `classify()` on any checkpoint | done 2026-09-29: save/load, `classify()`, CLI; `cuda` untested | |
+| 3. All training data and the first real run | next | |
+| 4 to 11 | not started | |
 
 ## Architectural decisions
 
@@ -86,7 +87,7 @@ concept.
 
 ## Phase 2: `classify()` on any checkpoint
 
-**User stories**: README *Planned usage*
+**User stories**: README *Usage*
 
 ### What to build
 
@@ -97,11 +98,12 @@ labels AG News never had, with poor accuracy.
 
 ### Acceptance criteria
 
-- [ ] `classify()` returns a dict keyed by the given options, values summing to 1
-- [ ] Each probability is mapped back to the right option name, covered by a test with a tiny
+- [x] `classify()` returns a dict keyed by the given options, values summing to 1
+- [x] Each probability is mapped back to the right option name, covered by a test with a tiny
       model
-- [ ] Too many options for the context length raises a clear error
-- [ ] Works on `cuda`, `mps` and `cpu`
+- [x] Too many options for the context length raises a clear error
+- [ ] Works on `cuda`, `mps` and `cpu` (`mps` and `cpu` verified, identical to 5e-7; `cuda`
+      waits for the Phase 10 cloud run)
 
 ---
 

@@ -5,10 +5,10 @@ instead returns probabilities over options you choose at request time. This vers
 [ModernBERT-base](https://huggingface.co/answerdotai/ModernBERT-base) (149M parameters) with a
 linear head that scores each option, and it is sized to be fine-tuned on a laptop GPU.
 
-> **Status:** in progress. Phase 1 of the [implementation plan](plans/undecided.md) is done:
-> the tracer run trains on AG News alone and reaches 0.863 accuracy with shuffled options
-> ([notes](results/tracer/NOTES.md)). Everything else below is still a plan, and the results
-> table stays empty until Phase 4. This is a case study: the goal is a working proof of concept
+> **Status:** in progress. Phases 1 and 2 of the [implementation plan](plans/undecided.md) are
+> done: the tracer run trains on AG News alone and reaches 0.863 accuracy with shuffled options
+> ([notes](results/tracer/NOTES.md)), and any checkpoint can be loaded and queried. Everything
+> else below is still a plan, and the results table stays empty until Phase 4. This is a case study: the goal is a working proof of concept
 > with honest numbers.
 >
 > Not affiliated with TypeSafe. "Jev" refers to their product and is used here only to
@@ -454,12 +454,12 @@ To be filled in. The remaining ablations get a table of their own.
 | undecided (LoRA) | | | | | |
 | undecided (full run, cloud) | | | | | |
 
-## Planned usage
+## Usage
 
 ```python
 from undecided import Undecided
 
-clf = Undecided.from_pretrained("runs/poc")
+clf = Undecided.from_pretrained("runs/poc")                # any run directory under runs/
 clf.classify(
     "My card was charged twice.",
     options=["billing", "bug report", "praise"],
@@ -468,21 +468,36 @@ clf.classify(
 # {"billing": 0.91, "bug report": 0.07, "praise": 0.02}   (illustrative output)
 ```
 
-## Planned layout
+The same from the terminal:
+
+```text
+uv run python -m undecided.classify runs/poc "My card was charged twice." \
+    --options billing "bug report" praise --instruction "Classify the support ticket."
+```
+
+`classify()` rejects duplicate options, fewer than 2 options, and more options than fit in the
+checkpoint's max length. The device is picked automatically (`cuda`, then `mps`, then `cpu`), or
+passed as `from_pretrained(path, device=...)`.
+
+## Layout
 
 ```text
 undecided/
 ├── src/undecided/
-│   ├── data.py        # dataset loaders, unified format, augmentation, collator
-│   ├── model.py       # OptionScorer and Undecided wrapper
-│   ├── train.py       # training loop, two learning-rate groups, checkpoints
-│   ├── evaluate.py    # accuracy, macro-F1, ECE, reliability plots, temperature scaling
-│   └── bench.py       # throughput and latency benchmarks
-├── configs/
-│   ├── poc.yaml       # local proof of concept
-│   └── full.yaml      # cloud run
-├── baselines/         # scripts that run the comparison models on the same eval sets
-└── results/           # metrics JSON and plots, committed
+│   ├── data.py        # dataset loaders into the unified record format
+│   ├── augment.py     # option sampling and shuffling
+│   ├── encoding.py    # packed <opt> input format, collation
+│   ├── model.py       # OptionScorer and the Undecided wrapper (save, load, classify)
+│   ├── train.py       # training loop, two learning-rate groups
+│   ├── evaluate.py    # accuracy now; macro-F1, ECE, reliability plots, temperature scaling later
+│   ├── run.py         # one experiment from a YAML config
+│   └── classify.py    # command-line classification with a checkpoint
+├── tests/
+├── configs/           # one YAML file per run (tracer now; poc and full later)
+├── plans/             # the implementation plan
+├── baselines/         # planned: comparison models on the same eval sets
+├── results/           # metrics JSON, plots and notes per run, committed
+└── runs/              # checkpoints, gitignored
 ```
 
 Tooling: `uv`, Python 3.12, `torch`, `transformers>=4.48` (the first release with ModernBERT;

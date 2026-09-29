@@ -25,9 +25,10 @@ from transformers import AutoModel
 
 from undecided.augment import shuffle_options
 from undecided.data import Record, convert_ag_news
+from undecided.device import pick_device
 from undecided.encoding import OPT_TOKEN, build_tokenizer
 from undecided.evaluate import evaluate
-from undecided.model import OptionScorer
+from undecided.model import OptionScorer, Undecided
 from undecided.train import TrainConfig, train
 
 matplotlib.use("Agg")
@@ -36,14 +37,6 @@ import matplotlib.pyplot as plt  # noqa: E402
 LOADERS = {
     "ag_news": ("fancyzhx/ag_news", convert_ag_news),
 }
-
-
-def pick_device() -> torch.device:
-    if torch.cuda.is_available():
-        return torch.device("cuda")
-    if torch.backends.mps.is_available():
-        return torch.device("mps")
-    return torch.device("cpu")
 
 
 def load_records(dataset: str, split: str, n: int, seed: int) -> list[Record]:
@@ -124,12 +117,7 @@ def main(config_path: str) -> None:
     plt.tight_layout()
     plt.savefig(results / "plots" / "loss.png", dpi=120)
 
-    checkpoint = Path("runs") / name
-    checkpoint.mkdir(parents=True, exist_ok=True)
-    torch.save(scorer.state_dict(), checkpoint / "scorer.pt")
-    tokenizer.save_pretrained(checkpoint)
-    (checkpoint / "run.json").write_text(json.dumps({"backbone": raw["backbone"],
-                                                     "max_length": train_cfg.max_length}) + "\n")
+    Undecided(scorer, tokenizer, train_cfg.max_length, device).save_pretrained(Path("runs") / name)
 
 
 if __name__ == "__main__":
