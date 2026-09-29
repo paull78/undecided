@@ -1,3 +1,5 @@
+import pytest
+
 from undecided.data import Record, convert_ag_news
 
 
@@ -10,7 +12,7 @@ def test_ag_news_rows_become_records_with_all_labels_as_readable_options():
     records = convert_ag_news(rows)
 
     assert records[0] == Record(
-        instruction="",
+        instruction="What is this news article about?",
         text="Stocks rally as rates fall",
         options=["world", "sports", "business", "science and technology"],
         answer_idx=2,
@@ -18,3 +20,58 @@ def test_ag_news_rows_become_records_with_all_labels_as_readable_options():
         group="train",
     )
     assert records[1].options[records[1].answer_idx] == "science and technology"
+
+
+def test_banking77_labels_become_readable_phrases_and_every_label_is_an_option():
+    from undecided.data import convert_banking77
+
+    labels = ["card_arrival", "Refund_not_showing_up", "apple_pay_or_google_pay"]
+    rows = [{"text": "Where is my refund?", "label_text": "Refund_not_showing_up"}]
+
+    [record] = convert_banking77(rows, labels)
+
+    assert record.options == ["card arrival", "refund not showing up", "apple pay or google pay"]
+    assert record.options[record.answer_idx] == "refund not showing up"
+    assert record.source == "banking77"
+    assert record.instruction  # canonical instruction for the task
+
+
+@pytest.mark.parametrize(
+    ("convert", "row", "answer", "source", "n_options"),
+    [
+        ("convert_emotion", {"text": "im so happy today", "label": 1}, "joy", "emotion", 6),
+        ("convert_sst2", {"sentence": "a charming journey", "label": 1}, "positive", "sst2", 2),
+        ("convert_trec", {"text": "How far is Denver ?", "label_text": "linear measures"},
+         "linear measures", "trec", 3),
+    ],
+)
+def test_each_training_dataset_converts_to_records_with_readable_options(convert, row, answer, source, n_options):
+    import undecided.data as data
+
+    kwargs = {"labels": ["dates", "linear measures", "cities"]} if source == "trec" else {}
+    [record] = getattr(data, convert)([row], **kwargs)
+
+    assert record.options[record.answer_idx] == answer
+    assert len(record.options) == n_options
+    assert record.source == source and record.group == "train"
+    assert record.text == next(iter(row.values()))
+    assert record.instruction
+
+
+def test_mnli_is_recast_with_the_hypothesis_inside_a_varied_instruction():
+    from undecided.data import convert_mnli
+
+    rows = [
+        {"premise": f"Premise {i}.", "hypothesis": f"Hypothesis {i}.", "label": i % 3} for i in range(60)
+    ] + [{"premise": "No gold label.", "hypothesis": "Skip me.", "label": -1}]
+
+    records = convert_mnli(rows, seed=0)
+
+    assert len(records) == 60
+    first = records[0]
+    assert first.text == "Premise 0."
+    assert "Hypothesis 0." in first.instruction
+    assert first.options == ["true", "cannot tell", "false"]
+    assert [r.options[r.answer_idx] for r in records[:3]] == ["true", "cannot tell", "false"]
+    assert len({r.instruction.replace(f"Hypothesis {i}.", "") for i, r in enumerate(records)}) > 3
+    assert records == convert_mnli(rows, seed=0)  # same seed, same templates

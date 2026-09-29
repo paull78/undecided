@@ -1,0 +1,49 @@
+{
+  "run": "poc",
+  "device": "mps",
+  "machine": {
+    "platform": "macOS-26.5-arm64-arm-64bit",
+    "processor": "arm",
+    "torch": "2.14.0"
+  },
+  "train": {
+    "examples": 30000,
+    "steps": 3750,
+    "seconds": 3154.9,
+    "examples_per_second": 19.02,
+    "final_loss": 0.4586,
+    "peak_memory_gb": 11.46
+  },
+  "datasets": {
+    "ag_news": {
+      "n": 1000,
+      "accuracy": 0.884,
+      "macro_f1": 0.8836994529328692
+    },
+    "emotion": {
+      "n": 1000,
+      "accuracy": 0.857,
+      "macro_f1": 0.7894894440451089
+    },
+    "banking77": {
+      "n": 1000,
+      "accuracy": 0.48,
+      "macro_f1": 0.4626849084358584
+    },
+    "trec": {
+      "n": 500,
+      "accuracy": 0.716,
+      "macro_f1": 0.5311890846120163
+    },
+    "sst2": {
+      "n": 872,
+      "accuracy": 0.823394495412844,
+      "macro_f1": 0.8232122169562928
+    },
+    "mnli": {
+      "n": 1000,
+      "accuracy": 0.495,
+      "macro_f1": 0.49043501048218036
+    }
+  }
+}

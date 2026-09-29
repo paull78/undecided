@@ -8,9 +8,10 @@
 | Phase | Status | Commit |
 |---|---|---|
 | 1. Tracer bullet | done 2026-09-29: tracer accuracy 0.863, 27.5 examples/s on MPS | `7152d57` |
-| 2. `classify()` on any checkpoint | done 2026-09-29: save/load, `classify()`, CLI; `cuda` untested | |
-| 3. All training data and the first real run | next | |
-| 4 to 11 | not started | |
+| 2. `classify()` on any checkpoint | done 2026-09-29: save/load, `classify()`, CLI; `cuda` untested | `12815bb` |
+| 3. All training data and the first real run | done 2026-09-29: in-distribution accuracy 0.48 to 0.88, [notes](../results/poc/NOTES.md) | |
+| 4. Held-out evaluation | next | |
+| 5 to 11 | not started | |
 
 ## Architectural decisions
 
@@ -121,13 +122,13 @@ preview command that prints sample augmented examples and label distributions, a
 
 ### Acceptance criteria
 
-- [ ] Tests for each loader's conversion, label verbalisation (e.g. `alarm_set` to
+- [x] Tests for each loader's conversion, label verbalisation (e.g. `alarm_set` to
       "alarm set"), MNLI recast, per-dataset caps and the instruction drop rate
-- [ ] The preview command prints 5 augmented examples per dataset and the label distribution,
+- [x] The preview command prints 5 augmented examples per dataset and the label distribution,
       and a manual read confirms labels match texts
-- [ ] `results/poc/metrics.json` has in-distribution accuracy and macro-F1 for all six training
+- [x] `results/poc/metrics.json` has in-distribution accuracy and macro-F1 for all six training
       datasets
-- [ ] Run time and peak memory of the proof-of-concept run are recorded
+- [x] Run time and peak memory of the proof-of-concept run are recorded
 
 ---
 

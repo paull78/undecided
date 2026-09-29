@@ -5,11 +5,12 @@ instead returns probabilities over options you choose at request time. This vers
 [ModernBERT-base](https://huggingface.co/answerdotai/ModernBERT-base) (149M parameters) with a
 linear head that scores each option, and it is sized to be fine-tuned on a laptop GPU.
 
-> **Status:** in progress. Phases 1 and 2 of the [implementation plan](plans/undecided.md) are
-> done: the tracer run trains on AG News alone and reaches 0.863 accuracy with shuffled options
-> ([notes](results/tracer/NOTES.md)), and any checkpoint can be loaded and queried. Everything
-> else below is still a plan, and the results table stays empty until Phase 4. This is a case study: the goal is a working proof of concept
-> with honest numbers.
+> **Status:** in progress. Phases 1 to 3 of the [implementation plan](plans/undecided.md) are
+> done: the proof-of-concept model trains on all six training datasets in 53 minutes on the
+> laptop, scores 0.48 to 0.88 accuracy in-distribution, and gets five hand-written examples
+> right, four of them with labels it never saw ([notes](results/poc/NOTES.md)). Everything
+> else below is still a plan, and the results table stays empty until Phase 4. This is a case
+> study: the goal is a working proof of concept with honest numbers.
 >
 > Not affiliated with TypeSafe. "Jev" refers to their product and is used here only to
 > describe the behaviour being reproduced.
@@ -279,7 +280,7 @@ Every source dataset is converted into the same record:
 | [`fancyzhx/ag_news`](https://huggingface.co/datasets/fancyzhx/ag_news) | news topic | 4 | |
 | [`dair-ai/emotion`](https://huggingface.co/datasets/dair-ai/emotion) | emotion | 6 | |
 | [`mteb/banking77`](https://huggingface.co/datasets/mteb/banking77) | banking intent | 77 | many fine-grained options |
-| [`SetFit/TREC-QC`](https://huggingface.co/datasets/SetFit/TREC-QC) | question type | 6 coarse, 50 fine | ships human-readable label names |
+| [`SetFit/TREC-QC`](https://huggingface.co/datasets/SetFit/TREC-QC) | question type | 50 (fine-grained) | ships human-readable label names |
 | [`stanfordnlp/sst2`](https://huggingface.co/datasets/stanfordnlp/sst2) | sentiment | 2 | the test split is unlabelled, validation is used for evaluation |
 | [`nyu-mll/multi_nli`](https://huggingface.co/datasets/nyu-mll/multi_nli) | NLI, recast | 3 | premise as text, hypothesis in the instruction |
 
@@ -303,13 +304,17 @@ classify.
 Each training example is rebuilt on the fly, so every epoch sees different variants:
 
 - **Option sampling.** 2 to 16 options per example: the correct label plus distractors drawn
-  from the same dataset's other labels. Small label sets (sentiment, NLI) always use all labels.
+  from the same dataset's other labels. Label sets of 3 or fewer (sentiment, NLI) always use all
+  labels, since dropping one would change the task.
 - **Shuffling.** Option order is random every time.
 - **Label verbalisation.** Raw labels become readable phrases: `alarm_set` becomes "alarm set",
   TREC's `DESC:manner` uses its shipped name "manner of an action". A few labels per dataset
-  get a hand-written paraphrase, so the model doesn't memorise exact strings.
-- **Instructions.** About 10 templates per task type, plus no instruction at all in 20% of
-  examples.
+  have hand-written paraphrases ("science and technology" can become "sci-tech"), swapped in
+  30% of the time so the model doesn't memorise exact strings.
+- **Instructions.** 8 templates per task type, plus no instruction at all in 20% of examples.
+  MNLI is the exception: its 6 templates carry the hypothesis, so one is picked per example when
+  loading and always kept. Templates and paraphrases live in
+  [`src/undecided/tasks.py`](src/undecided/tasks.py).
 - **Balancing.** Each dataset is capped (5,000 examples in the proof of concept) so that the
   large ones, MNLI and AG News, don't drown out the rest.
 
@@ -368,9 +373,9 @@ matter on MPS:
   slower but correct.
 - fp32 first. Mixed precision on MPS can still produce NaNs with some operations.
 
-Measured in the tracer run: 27.5 examples per second at batch size 16 on AG News (texts of
-about 59 tokens). The proof-of-concept run (30,000 examples, 2 epochs) should take 35 to 50
-minutes.
+Measured: 27.5 examples per second at batch size 16 in the tracer run (AG News only), and 19.0
+in the proof-of-concept run (30,000 examples, 2 epochs, 52.6 minutes, peak MPS memory 11.5 GB).
+The MPS allocator cache grows as new batch shapes appear, so the run clears it every 200 steps.
 
 The code picks `cuda`, `mps` or `cpu` automatically, so the same script runs unchanged in the
 cloud.
@@ -429,8 +434,7 @@ per-dataset T works, the Molas argument holds for this model too.
 
 ### Ablations
 
-Each is one extra training run, which stays cheap at the expected 35 to 50 minutes per local
-run.
+Each is one extra training run, about 50 minutes on the laptop.
 
 | Ablation | Question |
 |---|---|
@@ -484,16 +488,19 @@ passed as `from_pretrained(path, device=...)`.
 ```text
 undecided/
 ├── src/undecided/
-│   ├── data.py        # dataset loaders into the unified record format
-│   ├── augment.py     # option sampling and shuffling
+│   ├── data.py        # conversion of each dataset into the unified record format
+│   ├── sources.py     # where each dataset is downloaded from, sampling with a fixed seed
+│   ├── tasks.py       # instruction templates and label paraphrases per dataset
+│   ├── augment.py     # instructions, option sampling, paraphrasing and shuffling
 │   ├── encoding.py    # packed <opt> input format, collation
 │   ├── model.py       # OptionScorer and the Undecided wrapper (save, load, classify)
 │   ├── train.py       # training loop, two learning-rate groups
 │   ├── evaluate.py    # accuracy now; macro-F1, ECE, reliability plots, temperature scaling later
 │   ├── run.py         # one experiment from a YAML config
+│   ├── preview.py     # prints augmented examples and label counts for a config
 │   └── classify.py    # command-line classification with a checkpoint
 ├── tests/
-├── configs/           # one YAML file per run (tracer now; poc and full later)
+├── configs/           # one YAML file per run (tracer, poc; full later)
 ├── plans/             # the implementation plan
 ├── baselines/         # planned: comparison models on the same eval sets
 ├── results/           # metrics JSON, plots and notes per run, committed

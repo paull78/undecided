@@ -1,0 +1,14 @@
+# Memory check: the poc data, stopped after 300 steps.
+name: poc-memcheck
+backbone: answerdotai/ModernBERT-base
+seed: 0
+data:
+  train: {ag_news: 5000, emotion: 5000, banking77: 5000, trec: 5000, sst2: 5000, mnli: 5000}
+  eval: {ag_news: 50, emotion: 50, banking77: 50, trec: 50, sst2: 50, mnli: 50}
+train:
+  epochs: 2
+  batch_size: 16
+  max_length: 512
+  max_options: 16
+  augment: true
+  max_steps: 300

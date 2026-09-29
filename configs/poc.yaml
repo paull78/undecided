@@ -1,0 +1,13 @@
+# Proof of concept: all six training datasets, 5,000 examples each, on the laptop.
+name: poc
+backbone: answerdotai/ModernBERT-base
+seed: 0
+data:
+  train: {ag_news: 5000, emotion: 5000, banking77: 5000, trec: 5000, sst2: 5000, mnli: 5000}
+  eval: {ag_news: 1000, emotion: 1000, banking77: 1000, trec: 500, sst2: 872, mnli: 1000}
+train:
+  epochs: 2
+  batch_size: 16
+  max_length: 512
+  max_options: 16
+  augment: true

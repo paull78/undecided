@@ -1,6 +1,7 @@
 """Evaluation on fixed record sets."""
 
 import torch
+from sklearn.metrics import f1_score
 
 from undecided.data import Record
 from undecided.encoding import collate, encode
@@ -22,8 +23,17 @@ def predict(scorer: OptionScorer, tokenizer, records: list[Record], max_length: 
     return probs
 
 
+def score(records: list[Record], probs: list[list[float]]) -> dict:
+    """Accuracy and macro-F1. Labels are compared by name, since option order differs per record."""
+    gold = [r.options[r.answer_idx] for r in records]
+    predicted = [r.options[max(range(len(p)), key=p.__getitem__)] for r, p in zip(records, probs)]
+    return {
+        "n": len(records),
+        "accuracy": sum(g == p for g, p in zip(gold, predicted)) / len(records),
+        "macro_f1": f1_score(gold, predicted, average="macro", zero_division=0),
+    }
+
+
 def evaluate(scorer: OptionScorer, tokenizer, records: list[Record], max_length: int, batch_size: int,
              device: torch.device) -> dict:
-    probs = predict(scorer, tokenizer, records, max_length, batch_size, device)
-    correct = sum(max(range(len(p)), key=p.__getitem__) == r.answer_idx for p, r in zip(probs, records))
-    return {"n": len(records), "accuracy": correct / len(records)}
+    return score(records, predict(scorer, tokenizer, records, max_length, batch_size, device))

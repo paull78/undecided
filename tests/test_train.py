@@ -36,4 +36,24 @@ def test_training_memorises_a_small_fixed_set(tokenizer, tiny_scorer):
     train(tiny_scorer, tokenizer, records, cfg, device=torch.device("cpu"))
 
     metrics = evaluate(tiny_scorer, tokenizer, records, max_length=64, batch_size=16, device=torch.device("cpu"))
-    assert metrics == {"n": 32, "accuracy": 1.0}
+    assert metrics == {"n": 32, "accuracy": 1.0, "macro_f1": 1.0}
+
+
+def test_batches_cover_every_record_once_and_group_similar_lengths():
+    import random
+
+    from undecided.data import Record
+    from undecided.train import length_grouped_batches
+
+    rng = random.Random(0)
+    records = [
+        Record("", "word " * rng.choice([3, 5, 200, 250]), ["a", "b"], 0, "test", "train") for _ in range(640)
+    ]
+
+    batches = length_grouped_batches(records, batch_size=16, rng=random.Random(1))
+
+    flat = [r for batch in batches for r in batch]
+    assert sorted(map(id, flat)) == sorted(map(id, records))
+    assert all(len(b) <= 16 for b in batches)
+    mixed = sum(min(len(r.text) for r in b) * 10 < max(len(r.text) for r in b) for b in batches)
+    assert mixed <= 2  # short and long texts rarely share a batch

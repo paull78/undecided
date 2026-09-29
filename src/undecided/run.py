@@ -12,6 +12,7 @@ os.environ.setdefault("PYTORCH_ENABLE_MPS_FALLBACK", "1")  # must be set before 
 import argparse
 import json
 import platform
+import subprocess
 import random
 import time
 from dataclasses import asdict
@@ -20,32 +21,36 @@ from pathlib import Path
 import matplotlib
 import torch
 import yaml
-from datasets import load_dataset
 from transformers import AutoModel
 
 from undecided.augment import shuffle_options
-from undecided.data import Record, convert_ag_news
 from undecided.device import pick_device
 from undecided.encoding import OPT_TOKEN, build_tokenizer
 from undecided.evaluate import evaluate
 from undecided.model import OptionScorer, Undecided
+from undecided.sources import load_records
 from undecided.train import TrainConfig, train
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
-LOADERS = {
-    "ag_news": ("fancyzhx/ag_news", convert_ag_news),
-}
+def device_memory_gb(device: torch.device) -> float:
+    """Memory the device driver holds for this process: live tensors plus the allocator cache."""
+    if device.type == "mps":
+        return torch.mps.driver_allocated_memory() / 1e9
+    if device.type == "cuda":
+        return torch.cuda.max_memory_allocated() / 1e9
+    return 0.0
 
 
-def load_records(dataset: str, split: str, n: int, seed: int) -> list[Record]:
-    """A fixed-seed sample of n examples, the same on every call."""
-    path, convert = LOADERS[dataset]
-    rows = load_dataset(path, split=split)
-    if n < len(rows):
-        rows = rows.select(sorted(random.Random(seed).sample(range(len(rows)), n)))
-    return convert(rows)
+def memory_report(device: torch.device) -> str:
+    report = f"driver {device_memory_gb(device):5.1f} GB"
+    if device.type == "mps":
+        report += f"  tensors {torch.mps.current_allocated_memory() / 1e9:5.1f} GB"
+    free = subprocess.run(["memory_pressure"], capture_output=True, text=True).stdout.strip().splitlines()
+    if free:
+        report += f"  system free {free[-1].rsplit(' ', 1)[-1]}"
+    return report
 
 
 def build_scorer(backbone: str, tokenizer) -> OptionScorer:
@@ -68,18 +73,22 @@ def main(config_path: str) -> None:
     else:
         rng = random.Random(seed)
         eval_sets = {
-            ds: [shuffle_options(r, rng) for r in load_records(ds, "test", n, seed)]
+            ds: [shuffle_options(r, rng) for r in load_records(ds, "eval", n, seed)]
             for ds, n in raw["data"]["eval"].items()
         }
 
-    losses, start = [], time.time()
+    losses, start, peak_gb = [], time.time(), 0.0
 
     def on_step(step: int, loss: float) -> None:
+        nonlocal peak_gb
         losses.append(loss)
         if step % 20 == 0:
+            peak_gb = max(peak_gb, device_memory_gb(device))
             recent = sum(losses[-20:]) / len(losses[-20:])
             rate = step * train_cfg.batch_size / (time.time() - start)
-            print(f"step {step:5d}  loss {recent:.4f}  {rate:.1f} examples/s", flush=True)
+            print(f"step {step:5d}  loss {recent:.4f}  {rate:.1f} examples/s  {memory_report(device)}", flush=True)
+        if step % 200 == 0 and device.type == "mps":
+            torch.mps.empty_cache()  # batch shapes vary, so the allocator cache would keep growing
 
     train(scorer, tokenizer, train_records, train_cfg, device, on_step=on_step)
     seconds = time.time() - start
@@ -95,6 +104,7 @@ def main(config_path: str) -> None:
             "seconds": round(seconds, 1),
             "examples_per_second": round(len(losses) * train_cfg.batch_size / seconds, 2),
             "final_loss": round(sum(losses[-20:]) / len(losses[-20:]), 4),
+            "peak_memory_gb": round(peak_gb, 2),
         },
         "datasets": {
             ds: evaluate(scorer, tokenizer, records, train_cfg.max_length, 32, device)
