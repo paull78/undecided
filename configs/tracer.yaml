@@ -1,0 +1,14 @@
+# Tracer bullet: one dataset through every layer. 3,200 examples at batch 16 is 200 steps per
+# epoch, so the same run is the throughput benchmark.
+name: tracer
+backbone: answerdotai/ModernBERT-base
+seed: 0
+data:
+  train: {ag_news: 3200}
+  eval: {ag_news: 1000}
+train:
+  epochs: 3
+  batch_size: 16
+  max_length: 512
+  max_options: 16
+  augment: true

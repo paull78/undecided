@@ -81,20 +81,26 @@ The encoder reads the whole sequence, a single `Linear(768, 1)` scores the hidde
 probabilities. [Why this design](#why-this-design) explains how that works and why the options
 can change at runtime.
 
-The whole model is a few lines on top of `transformers`:
+The whole model is a few lines on top of `transformers`
+([`src/undecided/model.py`](src/undecided/model.py)):
 
 ```python
 class OptionScorer(nn.Module):
-    def __init__(self, tokenizer, name="answerdotai/ModernBERT-base"):
+    def __init__(self, encoder, opt_token_id):
         super().__init__()
-        self.encoder = AutoModel.from_pretrained(name, reference_compile=False)
-        self.encoder.resize_token_embeddings(len(tokenizer))
-        self.head = nn.Linear(self.encoder.config.hidden_size, 1)
-        self.opt_token_id = tokenizer.convert_tokens_to_ids("<opt>")
+        self.encoder = encoder                                       # AutoModel.from_pretrained(...)
+        self.head = nn.Linear(encoder.config.hidden_size, 1)
+        self.opt_token_id = opt_token_id
+        pretrained = encoder.get_input_embeddings().weight.detach()
+        self.opt_embedding = nn.Parameter(pretrained.mean(dim=0).clone())
 
     def forward(self, input_ids, attention_mask):
-        hidden = self.encoder(input_ids=input_ids, attention_mask=attention_mask).last_hidden_state
         is_opt = input_ids == self.opt_token_id                      # (batch, seq)
+        safe_ids = input_ids.masked_fill(is_opt, self.encoder.config.pad_token_id)
+        embeds = self.encoder.get_input_embeddings()(safe_ids)
+        embeds = torch.where(is_opt[..., None], self.opt_embedding, embeds)
+
+        hidden = self.encoder(inputs_embeds=embeds, attention_mask=attention_mask).last_hidden_state
         counts = is_opt.sum(dim=1)                                   # options per example
         max_opts = int(counts.max())
         opt_mask = torch.arange(max_opts, device=hidden.device)[None] < counts[:, None]
@@ -316,16 +322,22 @@ work for this design, for the reason given in [Packed options](#packed-options-l
 the comparison between option and text happens inside the encoder. The head-only ablation
 measures this directly.
 
-`<opt>` is a new token, so it is added to the tokeniser and its embedding starts as the mean of
-the existing token embeddings. That gives the model a neutral starting point and keeps early
-training stable.
+`<opt>` is a new token. It is added to the tokeniser, but its vector is a separate parameter
+rather than a new row in ModernBERT's embedding matrix: the model looks up every other token
+normally and writes the `<opt>` vector in at the marker positions. The vector starts as the mean
+of the pretrained token embeddings, a neutral starting point.
 
-Two learning rates keep the pretrained weights safe while the new parts catch up:
+Two learning rates keep the pretrained weights safe while the new head catches up:
 
 | Parameters | Learning rate |
 |---|---|
-| head + `<opt>` embedding | 1e-3 |
-| rest of the encoder | 3e-5 |
+| head | 1e-3 |
+| encoder, including the `<opt>` vector | 3e-5 |
+
+The `<opt>` vector started out in the fast group, and the tracer run showed why that was wrong:
+it feeds every attention layer, and moving it at 1e-3 collapsed the whole encoder output within
+200 steps (every token ended up with nearly the same hidden state, and accuracy stayed at chance).
+The measurements are in [`results/tracer/NOTES.md`](results/tracer/NOTES.md).
 
 ### Hyperparameters
 
@@ -347,16 +359,15 @@ The proof of concept runs on an Apple M4 Pro (20-core GPU, 48 GB unified memory)
 PyTorch's MPS backend. ModernBERT-base fully fine-tuned fits comfortably. Settings that
 matter on MPS:
 
-- `reference_compile=False` in the ModernBERT config. Its default `torch.compile` path is
-  unreliable on MPS.
 - `PYTORCH_ENABLE_MPS_FALLBACK=1`, so any unsupported operation falls back to the CPU instead
   of crashing.
 - No flash-attention on macOS. ModernBERT falls back to standard padded attention, which is
   slower but correct.
 - fp32 first. Mixed precision on MPS can still produce NaNs with some operations.
 
-The rough estimate is 30 to 90 minutes per run. That number is a guess until milestone 0
-measures real throughput with a 200-step benchmark.
+Measured in the tracer run: 27.5 examples per second at batch size 16 on AG News (texts of
+about 59 tokens). The proof-of-concept run (30,000 examples, 2 epochs) should take 35 to 50
+minutes.
 
 The code picks `cuda`, `mps` or `cpu` automatically, so the same script runs unchanged in the
 cloud.
@@ -415,7 +426,7 @@ per-dataset T works, the Molas argument holds for this model too.
 
 ### Ablations
 
-Each is one extra training run, which stays cheap at the expected 30 to 90 minutes per local
+Each is one extra training run, which stays cheap at the expected 35 to 50 minutes per local
 run.
 
 | Ablation | Question |
@@ -471,20 +482,20 @@ undecided/
 └── results/           # metrics JSON and plots, committed
 ```
 
-Tooling: `uv`, Python 3.12, `torch`, `transformers>=4.48` (the first release with ModernBERT),
-`datasets`, `scikit-learn`, `matplotlib`.
+Tooling: `uv`, Python 3.12, `torch`, `transformers>=4.48` (the first release with ModernBERT;
+developed on 5.17), `datasets`, `scikit-learn`, `matplotlib`.
 
 ## Milestones
 
 Each milestone has an exit check, so progress is visible and a broken step is caught early.
 
-- [ ] **0. Setup and benchmark.** Project skeleton, device detection, a 200-step throughput
+- [x] **0. Setup and benchmark.** Project skeleton, device detection, a 200-step throughput
       benchmark on MPS. *Exit:* measured examples per second, and a final choice of dataset
       size for the proof of concept.
 - [ ] **1. Data.** Loaders for all nine datasets, the unified format and augmentation.
       *Exit:* a script prints 5 random augmented examples per dataset and the label
       distribution, and they read correctly.
-- [ ] **2. Model.** `OptionScorer`, the collator and the loss. *Exit:* the model overfits 64
+- [x] **2. Model.** `OptionScorer`, the collator and the loss. *Exit:* the model overfits 64
       examples to near 100% accuracy (proves the plumbing works).
 - [ ] **3. Proof-of-concept training.** One full local run. *Exit:* held-out accuracy
       clearly above random on all three held-out datasets.

@@ -1,0 +1,19 @@
+name: tracer-overfit
+backbone: answerdotai/ModernBERT-base
+seed: 0
+data:
+  train:
+    ag_news: 64
+  eval_on_train: true
+train:
+  epochs: 30
+  batch_size: 16
+  head_lr: 0.001
+  encoder_lr: 3.0e-05
+  weight_decay: 0.01
+  warmup_ratio: 0.06
+  grad_clip: 1.0
+  max_length: 256
+  max_options: 16
+  augment: false
+  seed: 0

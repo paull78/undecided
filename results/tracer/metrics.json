@@ -1,0 +1,22 @@
+{
+  "run": "tracer",
+  "device": "mps",
+  "machine": {
+    "platform": "macOS-26.5-arm64-arm-64bit",
+    "processor": "arm",
+    "torch": "2.14.0"
+  },
+  "train": {
+    "examples": 3200,
+    "steps": 600,
+    "seconds": 348.8,
+    "examples_per_second": 27.52,
+    "final_loss": 0.291
+  },
+  "datasets": {
+    "ag_news": {
+      "n": 1000,
+      "accuracy": 0.863
+    }
+  }
+}

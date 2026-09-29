@@ -1,0 +1,12 @@
+# Plumbing check: the real backbone must memorise 64 fixed examples.
+name: tracer-overfit
+backbone: answerdotai/ModernBERT-base
+seed: 0
+data:
+  train: {ag_news: 64}
+  eval_on_train: true
+train:
+  epochs: 30
+  batch_size: 16
+  max_length: 256
+  augment: false

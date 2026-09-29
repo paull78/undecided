@@ -1,0 +1,20 @@
+name: tracer-v1-collapse
+backbone: answerdotai/ModernBERT-base
+seed: 0
+data:
+  train:
+    ag_news: 3200
+  eval:
+    ag_news: 1000
+train:
+  epochs: 1
+  batch_size: 16
+  head_lr: 0.001
+  encoder_lr: 3.0e-05
+  weight_decay: 0.01
+  warmup_ratio: 0.06
+  grad_clip: 1.0
+  max_length: 512
+  max_options: 16
+  augment: true
+  seed: 0

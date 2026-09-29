@@ -1,0 +1,22 @@
+{
+  "run": "tracer-overfit",
+  "device": "mps",
+  "machine": {
+    "platform": "macOS-26.5-arm64-arm-64bit",
+    "processor": "arm",
+    "torch": "2.14.0"
+  },
+  "train": {
+    "examples": 64,
+    "steps": 120,
+    "seconds": 71.1,
+    "examples_per_second": 27.02,
+    "final_loss": 0.0
+  },
+  "datasets": {
+    "train_set": {
+      "n": 64,
+      "accuracy": 1.0
+    }
+  }
+}

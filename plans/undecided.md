@@ -17,10 +17,12 @@ Durable decisions that apply across all phases:
 - **Key models**: `OptionScorer` (encoder plus `Linear(hidden, 1)` at each `<opt>` position,
   padded option slots masked to `-inf`) and `Undecided` (the user-facing wrapper with
   `from_pretrained()` and `classify(text, options, instruction=None) -> {option: probability}`).
-  `<opt>` embedding is initialised to the mean of the existing embeddings.
-- **Training loop**: plain PyTorch, no Trainer framework. Two AdamW parameter groups (head and
-  `<opt>` embedding at 1e-3, rest of the encoder at 3e-5), warmup plus linear decay, gradient
-  clipping, length-grouped batches with dynamic padding.
+  The `<opt>` vector is its own parameter, written into the input embeddings at the marker
+  positions (no row in the vocabulary), initialised to the mean pretrained embedding.
+- **Training loop**: plain PyTorch, no Trainer framework. Two AdamW parameter groups (head at
+  1e-3; encoder and `<opt>` vector at 3e-5, because `<opt>` at 1e-3 collapsed the encoder in
+  Phase 1), warmup plus linear decay, gradient clipping, dynamic padding. Length-grouped batches
+  arrive in Phase 3, when datasets with different text lengths are mixed.
 - **Runs are configs**: one YAML file per run. Every ablation and the cloud run are config
   differences, not code branches. A run is launched with a single command taking the config
   path.
@@ -33,12 +35,12 @@ Durable decisions that apply across all phases:
 - **Evaluation sets**: a fixed-seed sample per dataset, capped at about 2,000 examples, stored
   once and reused by every model, including baselines. Option order in evaluation is shuffled
   with a fixed seed too.
-- **Device**: `cuda`, then `mps`, then `cpu`. On MPS: `reference_compile=False`,
-  `PYTORCH_ENABLE_MPS_FALLBACK=1`, fp32 by default.
+- **Device**: `cuda`, then `mps`, then `cpu`. On MPS: `PYTORCH_ENABLE_MPS_FALLBACK=1`, fp32 by
+  default. (transformers 5 no longer has ModernBERT's `reference_compile` option.)
 - **Tests**: pytest, written test-first for the deterministic parts (dataset conversion,
   augmentation, tokenisation and `<opt>` positions, collation, model output shapes and masking,
-  metrics). Model tests use a tiny randomly initialised ModernBERT config, so the suite needs no
-  downloads and runs in seconds. Training quality is checked by runs, not unit tests.
+  metrics). Model tests use a tiny randomly initialised ModernBERT config, so the suite runs in
+  seconds; the only download is the ModernBERT tokeniser (a few MB, cached after the first run). Training quality is checked by runs, not unit tests.
 - **Tooling**: `uv`, Python 3.12, `torch`, `transformers>=4.48`, `datasets`, `scikit-learn`,
   `matplotlib`, `pytest`.
 
@@ -61,15 +63,15 @@ concept.
 
 ### Acceptance criteria
 
-- [ ] Project skeleton with `uv`, the package, the test suite and a gitignore for `runs/`
-- [ ] Tests cover: AG News conversion to the record schema, option sampling always includes the
+- [x] Project skeleton with `uv`, the package, the test suite and a gitignore for `runs/`
+- [x] Tests cover: AG News conversion to the record schema, option sampling always includes the
       correct option, shuffling moves `answer_idx` with it, `<opt>` count in the tokenised input
       equals the option count, text truncation never removes options, model logits have shape
       `(batch, max_options)` with `-inf` on padded slots
-- [ ] The model reaches near 100% training accuracy on 64 fixed examples
-- [ ] A 200-step benchmark on MPS reports examples per second; the number and the chosen
+- [x] The model reaches near 100% training accuracy on 64 fixed examples
+- [x] A 200-step benchmark on MPS reports examples per second; the number and the chosen
       proof-of-concept dataset size are recorded in `results/tracer/`
-- [ ] One command trains the tracer config and writes `config`, `metrics.json` (AG News
+- [x] One command trains the tracer config and writes `config`, `metrics.json` (AG News
       accuracy clearly above 25% chance) to `results/tracer/`
 
 ---

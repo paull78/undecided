@@ -1,0 +1,26 @@
+[project]
+name = "undecided"
+version = "0.1.0"
+description = "Jev-style zero-shot classifier: ModernBERT with a per-option linear head"
+readme = "README.md"
+authors = [
+    { name = "Paolo", email = "paull@cubi.it" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "datasets>=5.0.1",
+    "matplotlib>=3.11.2",
+    "pyyaml>=6.0.3",
+    "scikit-learn>=1.9.1",
+    "torch>=2.14.0",
+    "transformers>=4.48",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
