@@ -3,6 +3,14 @@
 > Source PRD: [README.md](../README.md). "Q1" to "Q5" are the five questions in *The idea*,
 > "M0" to "M7" are the milestones.
 
+## Progress
+
+| Phase | Status | Commit |
+|---|---|---|
+| 1. Tracer bullet | done 2026-09-29: tracer accuracy 0.863, 27.5 examples/s on MPS | `7152d57` |
+| 2. `classify()` on any checkpoint | next | |
+| 3 to 11 | not started | |
+
 ## Architectural decisions
 
 Durable decisions that apply across all phases:

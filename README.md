@@ -5,8 +5,11 @@ instead returns probabilities over options you choose at request time. This vers
 [ModernBERT-base](https://huggingface.co/answerdotai/ModernBERT-base) (149M parameters) with a
 linear head that scores each option, and it is sized to be fine-tuned on a laptop GPU.
 
-> **Status:** plan. Nothing below is implemented yet, and the results table is empty on
-> purpose. This is a case study: the goal is a working proof of concept with honest numbers.
+> **Status:** in progress. Phase 1 of the [implementation plan](plans/undecided.md) is done:
+> the tracer run trains on AG News alone and reaches 0.863 accuracy with shuffled options
+> ([notes](results/tracer/NOTES.md)). Everything else below is still a plan, and the results
+> table stays empty until Phase 4. This is a case study: the goal is a working proof of concept
+> with honest numbers.
 >
 > Not affiliated with TypeSafe. "Jev" refers to their product and is used here only to
 > describe the behaviour being reproduced.
