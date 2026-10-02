@@ -4,7 +4,7 @@ import random
 from collections.abc import Iterable
 from dataclasses import dataclass
 
-from undecided.tasks import INSTRUCTIONS
+from undecided.tasks import INSTRUCTIONS, MASSIVE_NAMES
 
 
 @dataclass(frozen=True)
@@ -20,7 +20,11 @@ class Record:
 AG_NEWS_LABELS = ["world", "sports", "business", "science and technology"]
 EMOTION_LABELS = ["sadness", "joy", "love", "anger", "fear", "surprise"]
 SST2_LABELS = ["negative", "positive"]
+YAHOO_LABELS = ["Society & Culture", "Science & Mathematics", "Health", "Education & Reference",
+                "Computers & Internet", "Sports", "Business & Finance", "Entertainment & Music",
+                "Family & Relationships", "Politics & Government"]
 MNLI_OPTIONS = ["true", "cannot tell", "false"]  # entailment, neutral, contradiction
+IRONY_LABELS = ["not ironic", "ironic"]
 
 
 def verbalise(label: str) -> str:
@@ -29,10 +33,11 @@ def verbalise(label: str) -> str:
 
 
 def _records(rows: Iterable[dict], source: str, labels: list[str], text_field: str = "text",
-             by_name: bool = False) -> list[Record]:
+             by_name: bool = False, group: str = "train", names: dict[str, str] | None = None) -> list[Record]:
     """labels is the full label set of the dataset, in a fixed order. Rows carry either the label
-    index ("label") or, with by_name, the raw label name ("label_text")."""
-    options = [verbalise(label) for label in labels]
+    index ("label") or, with by_name, the raw label name ("label_text"). names maps raw labels to
+    option text where verbalise() isn't enough."""
+    options = [names[label] if names else verbalise(label) for label in labels]
     return [
         Record(
             instruction=INSTRUCTIONS[source][0],
@@ -40,7 +45,7 @@ def _records(rows: Iterable[dict], source: str, labels: list[str], text_field: s
             options=list(options),
             answer_idx=labels.index(row["label_text"]) if by_name else row["label"],
             source=source,
-            group="train",
+            group=group,
         )
         for row in rows
     ]
@@ -83,3 +88,18 @@ def convert_mnli(rows: Iterable[dict], seed: int) -> list[Record]:
         for row in rows
         if row["label"] >= 0
     ]
+
+
+def convert_yahoo_answers(rows: Iterable[dict]) -> list[Record]:
+    """Question title and body as the text; the best answer is left out."""
+    rows = ({"text": f"{r['question_title']} {r['question_content']}".strip(), "label": r["topic"]} for r in rows)
+    return _records(rows, "yahoo_answers", YAHOO_LABELS, group="heldout_labels")
+
+
+def convert_massive(rows: Iterable[dict], labels: list[str]) -> list[Record]:
+    """Assistant intents with hand-written names: "iot_hue_lightoff" becomes "turn the lights off"."""
+    return _records(rows, "massive", labels, by_name=True, group="heldout_labels", names=MASSIVE_NAMES)
+
+
+def convert_tweet_irony(rows: Iterable[dict]) -> list[Record]:
+    return _records(rows, "tweet_irony", IRONY_LABELS, group="heldout_task")

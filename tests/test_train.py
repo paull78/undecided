@@ -36,7 +36,7 @@ def test_training_memorises_a_small_fixed_set(tokenizer, tiny_scorer):
     train(tiny_scorer, tokenizer, records, cfg, device=torch.device("cpu"))
 
     metrics = evaluate(tiny_scorer, tokenizer, records, max_length=64, batch_size=16, device=torch.device("cpu"))
-    assert metrics == {"n": 32, "accuracy": 1.0, "macro_f1": 1.0}
+    assert (metrics["n"], metrics["accuracy"], metrics["macro_f1"]) == (32, 1.0, 1.0)
 
 
 def test_batches_cover_every_record_once_and_group_similar_lengths():

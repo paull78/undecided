@@ -16,6 +16,9 @@ data:
     trec: 500
     sst2: 872
     mnli: 1000
+    yahoo_answers: 1000
+    massive: 1000
+    tweet_irony: 784
 train:
   epochs: 2
   batch_size: 16

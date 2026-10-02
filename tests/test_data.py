@@ -75,3 +75,46 @@ def test_mnli_is_recast_with_the_hypothesis_inside_a_varied_instruction():
     assert [r.options[r.answer_idx] for r in records[:3]] == ["true", "cannot tell", "false"]
     assert len({r.instruction.replace(f"Hypothesis {i}.", "") for i, r in enumerate(records)}) > 3
     assert records == convert_mnli(rows, seed=0)  # same seed, same templates
+
+
+def test_yahoo_questions_join_title_and_body_and_are_marked_as_held_out_labels():
+    from undecided.data import convert_yahoo_answers
+
+    rows = [{"question_title": "Why is the sky blue?", "question_content": "Asked by my kid.", "topic": 1},
+            {"question_title": "Best striker ever?", "question_content": "", "topic": 5}]
+
+    records = convert_yahoo_answers(rows)
+
+    assert records[0].text == "Why is the sky blue? Asked by my kid."
+    assert records[1].text == "Best striker ever?"
+    assert records[0].options[records[0].answer_idx] == "science & mathematics"
+    assert records[1].options[records[1].answer_idx] == "sports"
+    assert len(records[0].options) == 10
+    assert {r.group for r in records} == {"heldout_labels"}
+
+
+def test_massive_intents_get_plain_english_names_and_every_intent_is_an_option():
+    from undecided.data import convert_massive
+    from undecided.tasks import MASSIVE_NAMES
+
+    labels = sorted(MASSIVE_NAMES)
+    rows = [{"text": "wake me up at five am this week", "label_text": "alarm_set"},
+            {"text": "lights off please", "label_text": "iot_hue_lightoff"}]
+
+    records = convert_massive(rows, labels)
+
+    assert len(labels) == 60 and len(set(MASSIVE_NAMES.values())) == 60
+    assert all(len(r.options) == 60 for r in records)
+    assert [r.options[r.answer_idx] for r in records] == ["set an alarm", "turn the lights off"]
+    assert {r.group for r in records} == {"heldout_labels"}
+
+
+def test_irony_is_a_held_out_task_with_two_readable_options():
+    from undecided.data import convert_tweet_irony
+
+    plain, ironic = convert_tweet_irony([{"text": "Nice weather", "label": 0},
+                                         {"text": "Great, Monday again", "label": 1}])
+
+    assert plain.options == ironic.options == ["not ironic", "ironic"]
+    assert ironic.options[ironic.answer_idx] == "ironic"
+    assert plain.group == ironic.group == "heldout_task"

@@ -25,4 +25,23 @@ def test_labels_are_matched_by_name_even_when_option_order_differs_per_record():
     records = [rec(["a", "b", "c"], 2), rec(["c", "a", "b"], 0)]
     probs = [[0.1, 0.1, 0.8], [0.7, 0.2, 0.1]]
 
-    assert score(records, probs) == {"n": 2, "accuracy": 1.0, "macro_f1": 1.0}
+    metrics = score(records, probs)
+    assert (metrics["accuracy"], metrics["macro_f1"]) == (1.0, 1.0)
+
+
+def test_accuracy_is_broken_down_by_the_position_of_the_correct_option():
+    # Correct option first: 2 of 2 right. Second: 1 of 2. Third: 0 of 1.
+    records = [rec(["a", "b", "c"], 0), rec(["b", "a", "c"], 0),
+               rec(["a", "b", "c"], 1), rec(["c", "b", "a"], 1),
+               rec(["a", "b", "c"], 2)]
+    probs = [[0.8, 0.1, 0.1], [0.6, 0.3, 0.1],
+             [0.2, 0.7, 0.1], [0.5, 0.4, 0.1],
+             [0.9, 0.05, 0.05]]
+
+    by_position = score(records, probs)["accuracy_by_position"]
+
+    assert by_position == {
+        "1": {"n": 2, "accuracy": 1.0},
+        "2": {"n": 2, "accuracy": 0.5},
+        "3": {"n": 1, "accuracy": 0.0},
+    }

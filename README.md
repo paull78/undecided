@@ -5,12 +5,13 @@ instead returns probabilities over options you choose at request time. This vers
 [ModernBERT-base](https://huggingface.co/answerdotai/ModernBERT-base) (149M parameters) with a
 linear head that scores each option, and it is sized to be fine-tuned on a laptop GPU.
 
-> **Status:** in progress. Phases 1 to 3 of the [implementation plan](plans/undecided.md) are
-> done: the proof-of-concept model trains on all six training datasets in 53 minutes on the
-> laptop, scores 0.48 to 0.88 accuracy in-distribution, and gets five hand-written examples
-> right, four of them with labels it never saw ([notes](results/poc/NOTES.md)). Everything
-> else below is still a plan, and the results table stays empty until Phase 4. This is a case
-> study: the goal is a working proof of concept with honest numbers.
+> **Status:** in progress. Phases 1 to 4 of the [implementation plan](plans/undecided.md) are
+> done. The proof-of-concept model trains on six datasets in 53 minutes on the laptop and scores
+> 0.48 to 0.88 accuracy in-distribution. On labels it never saw it is well above chance (0.47 on
+> Yahoo's 10 topics, 0.33 on MASSIVE's 60 intents), but it fails on the one unseen task type,
+> irony, where it does no better than guessing ([notes](results/poc/NOTES.md)). Calibration,
+> latency, baselines and ablations are still a plan. This is a case study: the goal is a working
+> proof of concept with honest numbers.
 >
 > Not affiliated with TypeSafe. "Jev" refers to their product and is used here only to
 > describe the behaviour being reproduced.
@@ -299,6 +300,13 @@ The held-out datasets are the core of the case study. In-distribution accuracy o
 the model learned its training data; accuracy on these three shows whether it learned to
 classify.
 
+Options are worded as a user would type them. Yahoo's topics and irony's two classes ("ironic",
+"not ironic") need no help. MASSIVE's raw intents are terse ("iot_hue_lightoff",
+"email_querycontact"), so each of the 60 has a hand-written name ("turn the lights off", "look up a
+contact"), fixed in `tasks.py` before the first held-out evaluation. Evaluation samples are 1,000
+Yahoo questions, 1,000 MASSIVE utterances with all 60 intents offered at once, and all 784 irony
+test tweets (60% not ironic, so always answering "not ironic" scores 0.60).
+
 ### Augmentation
 
 Each training example is rebuilt on the fly, so every epoch sees different variants:
@@ -483,6 +491,14 @@ uv run python -m undecided.classify runs/poc "My card was charged twice." \
 checkpoint's max length. The device is picked automatically (`cuda`, then `mps`, then `cpu`), or
 passed as `from_pretrained(path, device=...)`.
 
+Training, evaluation and the results tables:
+
+```text
+uv run python -m undecided.run configs/poc.yaml               # train, evaluate, save runs/poc
+uv run python -m undecided.run configs/poc.yaml --eval-only   # re-evaluate runs/poc, no training
+uv run python -m undecided.results results/poc results/tracer # Markdown tables for this README
+```
+
 ## Layout
 
 ```text
@@ -495,8 +511,9 @@ undecided/
 │   ├── encoding.py    # packed <opt> input format, collation
 │   ├── model.py       # OptionScorer and the Undecided wrapper (save, load, classify)
 │   ├── train.py       # training loop, two learning-rate groups
-│   ├── evaluate.py    # accuracy now; macro-F1, ECE, reliability plots, temperature scaling later
-│   ├── run.py         # one experiment from a YAML config
+│   ├── evaluate.py    # accuracy, macro-F1, accuracy by position; calibration later
+│   ├── run.py         # one experiment from a YAML config, or re-evaluation of a checkpoint
+│   ├── results.py     # Markdown tables from results/*/metrics.json
 │   ├── preview.py     # prints augmented examples and label counts for a config
 │   └── classify.py    # command-line classification with a checkpoint
 ├── tests/
@@ -517,13 +534,14 @@ Each milestone has an exit check, so progress is visible and a broken step is ca
 - [x] **0. Setup and benchmark.** Project skeleton, device detection, a 200-step throughput
       benchmark on MPS. *Exit:* measured examples per second, and a final choice of dataset
       size for the proof of concept.
-- [ ] **1. Data.** Loaders for all nine datasets, the unified format and augmentation.
+- [x] **1. Data.** Loaders for all nine datasets, the unified format and augmentation.
       *Exit:* a script prints 5 random augmented examples per dataset and the label
       distribution, and they read correctly.
 - [x] **2. Model.** `OptionScorer`, the collator and the loss. *Exit:* the model overfits 64
       examples to near 100% accuracy (proves the plumbing works).
 - [ ] **3. Proof-of-concept training.** One full local run. *Exit:* held-out accuracy
-      clearly above random on all three held-out datasets.
+      clearly above random on all three held-out datasets. *Partly met:* Yahoo and MASSIVE
+      pass, irony does not.
 - [ ] **4. Evaluation.** Metrics, reliability diagrams, calibration experiment, latency,
       baselines. *Exit:* the results table is filled in for the proof of concept.
 - [ ] **5. Ablations.** Head only, LoRA, no shuffling, option count, no instructions, option

@@ -9,9 +9,10 @@
 |---|---|---|
 | 1. Tracer bullet | done 2026-09-29: tracer accuracy 0.863, 27.5 examples/s on MPS | `7152d57` |
 | 2. `classify()` on any checkpoint | done 2026-09-29: save/load, `classify()`, CLI; `cuda` untested | `12815bb` |
-| 3. All training data and the first real run | done 2026-09-29: in-distribution accuracy 0.48 to 0.88, [notes](../results/poc/NOTES.md) | |
-| 4. Held-out evaluation | next | |
-| 5 to 11 | not started | |
+| 3. All training data and the first real run | done 2026-09-29: in-distribution accuracy 0.48 to 0.88, [notes](../results/poc/NOTES.md) | `9f61d0b` |
+| 4. Held-out evaluation | done 2026-09-29: Yahoo 0.469, MASSIVE 0.325 (60 options), irony 0.446, below chance; M3 exit partly met | |
+| 5. Calibration | next | |
+| 6 to 11 | not started | |
 
 ## Architectural decisions
 
@@ -145,12 +146,13 @@ into the Markdown table used in the README.
 
 ### Acceptance criteria
 
-- [ ] Tests for the three held-out conversions and for accuracy-by-position on a hand-made
+- [x] Tests for the three held-out conversions and for accuracy-by-position on a hand-made
       prediction set
-- [ ] MASSIVE is evaluated with all 60 options in one sequence
+- [x] MASSIVE is evaluated with all 60 options in one sequence
 - [ ] `results/poc/metrics.json` has held-out accuracy and macro-F1 for all three datasets, and
-      all three are clearly above random (M3 exit)
-- [ ] The results command prints a README-ready table from existing results
+      all three are clearly above random (M3 exit). *Partly:* Yahoo and MASSIVE pass; irony
+      scores 0.446, with no signal (AUC 0.46), see [notes](../results/poc/NOTES.md)
+- [x] The results command prints a README-ready table from existing results
 
 ---
 
