@@ -33,6 +33,10 @@ SOURCES = {
     "massive": Source("SetFit/amazon_massive_intent_en-US", "train", "test", data.convert_massive,
                       label_field="label_text"),
     "tweet_irony": Source("cardiffnlp/tweet_eval", "train", "test", data.convert_tweet_irony, config="irony"),
+    # Added in Phase 4b. SMS spam has only a train split, so evaluation samples from it too.
+    "sms_spam": Source("ucirvine/sms_spam", "train", "train", data.convert_sms_spam),
+    "tweet_hate": Source("cardiffnlp/tweet_eval", "train", "test", data.convert_tweet_hate, config="hate"),
+    "subjectivity": Source("SetFit/subj", "train", "test", data.convert_subjectivity),
 }
 
 

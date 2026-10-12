@@ -118,3 +118,26 @@ def test_irony_is_a_held_out_task_with_two_readable_options():
     assert plain.options == ironic.options == ["not ironic", "ironic"]
     assert ironic.options[ironic.answer_idx] == "ironic"
     assert plain.group == ironic.group == "heldout_task"
+
+
+@pytest.mark.parametrize(
+    ("convert", "rows", "options", "answers"),
+    [
+        ("convert_sms_spam", [{"sms": "WINNER! Claim your prize now\n", "label": 1}, {"sms": "See you at 5", "label": 0}],
+         ["not spam", "spam"], ["spam", "not spam"]),
+        ("convert_tweet_hate", [{"text": "@user have a nice day", "label": 0}],
+         ["not hate speech", "hate speech"], ["not hate speech"]),
+        ("convert_subjectivity", [{"text": "the film is set in 1920s paris .", "label": 0, "label_text": "objective"},
+                                  {"text": "a gorgeous , witty film .", "label": 1, "label_text": "subjective"}],
+         ["objective", "subjective"], ["objective", "subjective"]),
+    ],
+)
+def test_extra_held_out_tasks_are_binary_with_readable_options(convert, rows, options, answers):
+    import undecided.data as data
+
+    records = getattr(data, convert)(rows)
+
+    assert [r.options for r in records] == [options] * len(rows)
+    assert [r.options[r.answer_idx] for r in records] == answers
+    assert {r.group for r in records} == {"heldout_task"}
+    assert all(r.instruction and r.text == r.text.strip() for r in records)

@@ -10,8 +10,9 @@
 | 1. Tracer bullet | done 2026-09-29: tracer accuracy 0.863, 27.5 examples/s on MPS | `7152d57` |
 | 2. `classify()` on any checkpoint | done 2026-09-29: save/load, `classify()`, CLI; `cuda` untested | `12815bb` |
 | 3. All training data and the first real run | done 2026-09-29: in-distribution accuracy 0.48 to 0.88, [notes](../results/poc/NOTES.md) | `9f61d0b` |
-| 4. Held-out evaluation | done 2026-09-29: Yahoo 0.469, MASSIVE 0.325 (60 options), irony 0.446, below chance; M3 exit partly met | |
-| 5. Calibration | next | |
+| 4. Held-out evaluation | done 2026-09-29: Yahoo 0.469, MASSIVE 0.325 (60 options), irony 0.446, below chance; M3 exit partly met | `1a8b3bc` |
+| 4b. Unseen task types | step 1 done 2026-10-02: all four unseen task types fail (AUC 0.37 to 0.56), so step 2 runs; step 2 proposed, awaiting go-ahead | |
+| 5. Calibration | after 4b | |
 | 6 to 11 | not started | |
 
 ## Architectural decisions
@@ -153,6 +154,119 @@ into the Markdown table used in the README.
       all three are clearly above random (M3 exit). *Partly:* Yahoo and MASSIVE pass; irony
       scores 0.446, with no signal (AUC 0.46), see [notes](../results/poc/NOTES.md)
 - [x] The results command prints a README-ready table from existing results
+
+---
+
+## Phase 4b: Unseen task types
+
+Added on 2026-10-02 after Phase 4, at the user's request, to mitigate the irony failure before
+calibration.
+
+**User stories**: Q2, M3 exit check
+
+### Finding that triggered it
+
+On tweet_eval irony, the only held-out *task type*, the poc model scores 0.446: below a coin flip
+and below always answering "not ironic" (0.60). It answers "ironic" for 74% of tweets, precision
+on "ironic" equals the base rate, and the AUC of P(ironic) is 0.46 (SST-2: 0.89), so it carries no
+irony signal at all. Rewording the instruction or the options (diagnostic only) never beat the
+majority baseline. New *labels* generalise well (Yahoo 4.7 times chance, MASSIVE 19 times chance),
+so the gap is specific to new task types. Details in [the poc notes](../results/poc/NOTES.md).
+
+### Decisions
+
+- **Mitigate before Phase 5.** Calibration has to be measured on the model that is kept; fixing
+  afterwards would mean redoing Phase 5.
+- **Diagnose before fixing.** One held-out task cannot tell "new task types fail" from "irony
+  is too hard". Irony needs reading the opposite of the literal words, on noisy tweets. Step 1
+  adds more held-out task types, evaluated on the existing checkpoint, to decide whether step 2
+  is needed.
+- **Held-out stays held out.** Nothing resembling irony (sarcasm datasets, for example) goes into
+  training, and the step 1 datasets become permanent held-out sets, never trained on.
+- **Rejected mitigations:**
+  - Correcting the label prior at inference (e.g. contextual calibration) only moves the
+    threshold; with AUC 0.46 there is no signal to recover, so the best case is the majority
+    baseline.
+  - Tuning instruction or option wording on the test set would leak, and the diagnostic showed
+    it doesn't help anyway.
+  - A larger backbone (ModernBERT-large) may help with pragmatics but is slow on the laptop and
+    leaves the narrow task mix untouched; it belongs to the optional cloud run (Phase 10).
+  - Per-task fine-tuning with a few hundred labels is not zero-shot. It stays a documented
+    fallback for users, not a fix.
+
+### Step 1: more held-out task types (no training)
+
+Three task types absent from training, picked to separate task from domain:
+
+| Dataset | Task | Options | Why |
+|---|---|---|---|
+| `ucirvine/sms_spam` | spam detection | spam, not spam | new task, new domain; 13% spam, so macro-F1 matters |
+| `cardiffnlp/tweet_eval` (`hate`) | hate speech | hate speech, not hate speech | tweets like irony: separates "new task" from "Twitter text" |
+| `SetFit/subj` | subjectivity | objective, subjective | new task, familiar domain (film sentences, like SST-2) |
+
+SMS spam has only a train split, so its evaluation sample comes from it; the 200 examples for
+its per-dataset temperature in Phase 5 must be drawn disjoint from that sample.
+
+Outcome rule: if most of these land well above their majority baseline, irony is the outlier,
+the write-up says so, and Phase 5 follows. If they fail too, the model has only learned its six
+training task types, and step 2 runs.
+
+### Step 1 outcome (2026-10-02): general failure
+
+Same poc checkpoint, `--eval-only`. The nine earlier datasets reproduced exactly. All four unseen
+task types score below their majority baseline, and none ranks better than chance:
+
+| Dataset | Accuracy | Macro-F1 | Majority | Predicted positive / actual | AUC |
+|---|---|---|---|---|---|
+| tweet_irony | 0.446 | 0.439 | 0.603 | 0.74 / 0.40 | 0.46 |
+| sms_spam | 0.839 | 0.511 | 0.851 | 0.03 / 0.15 | 0.56 |
+| tweet_hate | 0.494 | 0.493 | 0.563 | 0.59 / 0.44 | 0.51 |
+| subjectivity | 0.470 | 0.404 | 0.511 | 0.13 / 0.49 | 0.37 |
+| sst2 (trained, for reference) | 0.823 | 0.823 | 0.509 | 0.54 / 0.51 | 0.89 |
+
+So irony is not an outlier: the model learned its six training task types, not to follow an
+instruction for a new one. Subjectivity ranks clearly *below* chance; the label mapping was
+checked (0 is "objective"), and a plausible reading is that SUBJ's objective sentences are plot
+summaries full of charged words ("villainous", "horrifying murders"), which the model takes for
+opinion. Step 2 runs.
+
+### Step 2: task diversity (one retrain, about an hour)
+
+The likely cause is the narrow training mix: six task types, mostly "match the text to a label
+name", so the instruction carries little weight. Keeping the total at about 30k examples:
+
+- More training task types, none resembling a held-out task. Proposed after checking that each
+  loads:
+
+  | Dataset | Task | Options |
+  |---|---|---|
+  | `nyu-mll/glue` (`qqp`) | are two questions duplicates? | duplicate, not duplicate |
+  | `nyu-mll/glue` (`qnli`) | does the sentence answer the question? | answers it, does not answer it |
+  | `nyu-mll/glue` (`cola`) | is the sentence grammatical? | grammatical, ungrammatical |
+  | `google/boolq` | yes/no question about a passage | yes, no |
+
+  Dropped from the first list: toxicity (too close to the hate-speech held-out set) and stance
+  (`tweet_eval` stance has a few hundred tweets per target, and opinion-towards-a-target is close
+  to the subjectivity held-out set). Fact checking needs a loader-script-free source; PAWS
+  (paraphrase) loads but duplicates QQP's task type.
+- Yes/no recasting as an augmentation: some training examples become a property check against
+  one of their labels, either "yes / no" or "<label> / not <label>" (the shape of every binary
+  held-out task, e.g. "ironic / not ironic"), with the true label and a distractor equally
+  often, so the answer is balanced. This also feeds the weak NLI task.
+- Mix: the six current datasets at 3,000 each plus the four new ones at 3,000 each (30k, 2 epochs,
+  the same budget as `poc`), saved as a new run so `poc` stays as the baseline.
+
+The new run is compared with `poc` on every in-distribution and held-out dataset, to check that
+held-out tasks improve without in-distribution scores dropping.
+
+### Acceptance criteria
+
+- [x] Tests for the three new held-out conversions
+- [x] `results/poc/metrics.json` has all six held-out datasets, with majority baselines next to
+      chance in the notes
+- [x] A written outcome for step 1: irony outlier or general failure, and whether step 2 runs
+- [ ] If step 2 runs: a new run with its own results folder, compared with `poc` on every
+      dataset, and the decision on which checkpoint Phase 5 uses
 
 ---
 

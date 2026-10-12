@@ -19,6 +19,9 @@ data:
     yahoo_answers: 1000
     massive: 1000
     tweet_irony: 784
+    sms_spam: 1000
+    tweet_hate: 1000
+    subjectivity: 1000
 train:
   epochs: 2
   batch_size: 16

@@ -6,7 +6,8 @@ data:
   train: {ag_news: 5000, emotion: 5000, banking77: 5000, trec: 5000, sst2: 5000, mnli: 5000}
   # Held-out datasets come last, so the in-distribution samples keep their option shuffles.
   eval: {ag_news: 1000, emotion: 1000, banking77: 1000, trec: 500, sst2: 872, mnli: 1000,
-         yahoo_answers: 1000, massive: 1000, tweet_irony: 784}
+         yahoo_answers: 1000, massive: 1000, tweet_irony: 784,
+         sms_spam: 1000, tweet_hate: 1000, subjectivity: 1000}  # last three added in Phase 4b
 train:
   epochs: 2
   batch_size: 16

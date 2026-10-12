@@ -57,6 +57,38 @@ nothing in training asks whether a text means the opposite of what it says, and 
 (SST-2, emotion) is the closest thing it saw. The baselines in Phase 7 will show whether
 irony is hard for zero-shot models in general or only for this one.
 
+## More unseen task types (Phase 4b, step 1)
+
+To tell "irony is hard" from "unseen task types fail", three more held-out task types were added
+and the same checkpoint re-scored. The nine earlier datasets reproduced exactly.
+
+| Dataset | Task | n | Accuracy | Macro-F1 | Majority | Predicted positive / actual | AUC |
+|---|---|---|---|---|---|---|---|
+| tweet_irony | irony | 784 | 0.446 | 0.439 | 0.603 | 0.74 / 0.40 | 0.46 |
+| sms_spam | spam | 1,000 | 0.839 | 0.511 | 0.851 | 0.03 / 0.15 | 0.56 |
+| tweet_hate | hate speech | 1,000 | 0.494 | 0.493 | 0.563 | 0.59 / 0.44 | 0.51 |
+| subjectivity | objective or subjective | 1,000 | 0.470 | 0.404 | 0.511 | 0.13 / 0.49 | 0.37 |
+| sst2 (trained) | sentiment | 872 | 0.823 | 0.823 | 0.509 | 0.54 / 0.51 | 0.89 |
+
+"Positive" is the second option of each pair (ironic, spam, hate speech, subjective, positive).
+AUC is computed on P(positive) and ignores the decision threshold, so it shows whether any signal
+exists at all.
+
+Irony is not an outlier. All four unseen task types land below their majority baseline with no
+usable ranking, while SST-2, a binary task it trained on, ranks at 0.89. The model learned its
+six training task types, not how to follow an instruction for a new one. Spam at 0.839 looks
+fine until the majority baseline (0.851) and macro-F1 (0.511) are next to it: it calls almost
+nothing spam.
+
+Subjectivity ranks clearly below chance (AUC 0.37). The label mapping was checked (0 is
+"objective" in the dataset's own label names). A plausible reading, not tested: SUBJ's
+objective sentences are plot summaries full of charged words ("villainous pirates", "horrifying
+murders", "grief"), and the model takes emotional vocabulary for opinion.
+
+Next is a retrain with more varied task types (Phase 4b, step 2). The reasoning, the rejected
+alternatives and the proposed datasets are in
+[the plan](../../plans/undecided.md#phase-4b-unseen-task-types).
+
 ### Position of the correct option
 
 No first-option bias. On the small-option datasets accuracy is flat or slightly rising across

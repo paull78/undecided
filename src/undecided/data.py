@@ -25,6 +25,9 @@ YAHOO_LABELS = ["Society & Culture", "Science & Mathematics", "Health", "Educati
                 "Family & Relationships", "Politics & Government"]
 MNLI_OPTIONS = ["true", "cannot tell", "false"]  # entailment, neutral, contradiction
 IRONY_LABELS = ["not ironic", "ironic"]
+SPAM_LABELS = ["not spam", "spam"]
+HATE_LABELS = ["not hate speech", "hate speech"]
+SUBJECTIVITY_LABELS = ["objective", "subjective"]
 
 
 def verbalise(label: str) -> str:
@@ -103,3 +106,16 @@ def convert_massive(rows: Iterable[dict], labels: list[str]) -> list[Record]:
 
 def convert_tweet_irony(rows: Iterable[dict]) -> list[Record]:
     return _records(rows, "tweet_irony", IRONY_LABELS, group="heldout_task")
+
+
+def convert_sms_spam(rows: Iterable[dict]) -> list[Record]:
+    rows = ({"text": r["sms"].strip(), "label": r["label"]} for r in rows)
+    return _records(rows, "sms_spam", SPAM_LABELS, group="heldout_task")
+
+
+def convert_tweet_hate(rows: Iterable[dict]) -> list[Record]:
+    return _records(rows, "tweet_hate", HATE_LABELS, group="heldout_task")
+
+
+def convert_subjectivity(rows: Iterable[dict]) -> list[Record]:
+    return _records(rows, "subjectivity", SUBJECTIVITY_LABELS, group="heldout_task")

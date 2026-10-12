@@ -8,10 +8,11 @@ linear head that scores each option, and it is sized to be fine-tuned on a lapto
 > **Status:** in progress. Phases 1 to 4 of the [implementation plan](plans/undecided.md) are
 > done. The proof-of-concept model trains on six datasets in 53 minutes on the laptop and scores
 > 0.48 to 0.88 accuracy in-distribution. On labels it never saw it is well above chance (0.47 on
-> Yahoo's 10 topics, 0.33 on MASSIVE's 60 intents), but it fails on the one unseen task type,
-> irony, where it does no better than guessing ([notes](results/poc/NOTES.md)). Calibration,
-> latency, baselines and ablations are still a plan. This is a case study: the goal is a working
-> proof of concept with honest numbers.
+> Yahoo's 10 topics, 0.33 on MASSIVE's 60 intents), but on task types it never saw (irony, spam,
+> hate speech, subjectivity) it does no better than guessing ([notes](results/poc/NOTES.md)).
+> Phase 4b, a retrain with more varied task types, comes before calibration. Latency, baselines
+> and ablations are still a plan. This is a case study: the goal is a working proof of concept
+> with honest numbers.
 >
 > Not affiliated with TypeSafe. "Jev" refers to their product and is used here only to
 > describe the behaviour being reproduced.
@@ -295,10 +296,14 @@ versions of `datasets` no longer run, so the parquet and JSONL mirrors above are
 | [`community-datasets/yahoo_answers_topics`](https://huggingface.co/datasets/community-datasets/yahoo_answers_topics) | question topic | 10 | new labels, familiar task type |
 | [`SetFit/amazon_massive_intent_en-US`](https://huggingface.co/datasets/SetFit/amazon_massive_intent_en-US) | assistant intent | 60 | new labels, far more options than seen in training |
 | [`cardiffnlp/tweet_eval`](https://huggingface.co/datasets/cardiffnlp/tweet_eval) (`irony`) | irony detection | 2 | a task type absent from training |
+| [`ucirvine/sms_spam`](https://huggingface.co/datasets/ucirvine/sms_spam) | spam detection | 2 | a task type absent from training, in a new domain |
+| [`cardiffnlp/tweet_eval`](https://huggingface.co/datasets/cardiffnlp/tweet_eval) (`hate`) | hate speech | 2 | a task type absent from training, on tweets like irony |
+| [`SetFit/subj`](https://huggingface.co/datasets/SetFit/subj) | subjectivity | 2 | a task type absent from training, in a familiar domain |
 
 The held-out datasets are the core of the case study. In-distribution accuracy only shows that
-the model learned its training data; accuracy on these three shows whether it learned to
-classify.
+the model learned its training data; accuracy on these shows whether it learned to
+classify. The last three were added in Phase 4b, after irony failed, to tell a hard task apart
+from unseen task types failing in general.
 
 Options are worded as a user would type them. Yahoo's topics and irony's two classes ("ironic",
 "not ironic") need no help. MASSIVE's raw intents are terse ("iot_hue_lightoff",

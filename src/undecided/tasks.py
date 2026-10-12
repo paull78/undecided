@@ -67,6 +67,9 @@ INSTRUCTIONS = {
     "yahoo_answers": ["What topic is this question about?"],
     "massive": ["What does the user want the voice assistant to do?"],
     "tweet_irony": ["Is this tweet ironic?"],
+    "sms_spam": ["Is this text message spam?"],
+    "tweet_hate": ["Is this tweet hate speech?"],
+    "subjectivity": ["Is this sentence objective or subjective?"],
 }
 
 # MASSIVE's raw intents are terse ("iot_hue_lightoff", "email_querycontact"). These are the
