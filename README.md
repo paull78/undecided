@@ -116,7 +116,7 @@ training noise dominates. Only the large effects above are firm.
 **One practical lesson:** a new special-token embedding must train at the encoder's learning rate,
 not the new head's; at the head's rate it collapsed the encoder in 200 steps.
 
-## Questions a reviewer would ask
+## Questions and caveats
 
 **How was the `<opt>` collapse found?** The first tracer run stayed near chance (0.308 against 0.25,
 its loss at the uniform-guess level) while a 64-example overfit test passed, so the plumbing worked and training did not. Text-token hidden states had
