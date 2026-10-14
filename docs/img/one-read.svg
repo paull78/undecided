@@ -1,0 +1,111 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="354" viewBox="0 0 800 354" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#57606a"/>
+    </marker>
+    <marker id="arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2563b8"/>
+    </marker>
+  </defs>
+
+  <rect x="0.5" y="0.5" width="799" height="353" rx="14" fill="#fbfbf9" stroke="#e3e3dc"/>
+
+  <!-- BAND 1: everything goes into one line -->
+  <text x="24" y="30" font-size="12.5" font-weight="bold" fill="#6a6f76">1. Everything goes into one line</text>
+
+  <!-- callout to the first marker -->
+  <path d="M290,26 H251 V50" fill="none" stroke="#2563b8" stroke-width="1.2"/>
+  <circle cx="251" cy="50" r="2" fill="#2563b8"/>
+  <text x="296" y="30" font-size="12.5" fill="#2563b8">a marker before each option</text>
+
+  <!-- strip segments -->
+  <rect x="24" y="42" width="214" height="38" rx="8" fill="#eef0f2"/>
+  <rect x="545" y="42" width="231" height="38" rx="8" fill="#eef0f2"/>
+  <rect x="228" y="42" width="327" height="38" fill="#e7effa"/>
+  <rect x="24" y="42" width="752" height="38" rx="8" fill="none" stroke="#8c939b" stroke-width="1.2"/>
+  <g stroke="#8c939b" stroke-width="1.2">
+    <line x1="228" y1="42" x2="228" y2="80"/>
+    <line x1="325" y1="42" x2="325" y2="80"/>
+    <line x1="455" y1="42" x2="455" y2="80"/>
+    <line x1="555" y1="42" x2="555" y2="80"/>
+  </g>
+
+  <g font-size="15" fill="#1f2328">
+    <text x="36" y="66">Classify the support ticket.</text>
+    <text x="271" y="66">billing</text>
+    <text x="368" y="66">bug report</text>
+    <text x="498" y="66">praise</text>
+    <text x="567" y="66">My card was charged twice.</text>
+  </g>
+
+  <!-- marker tags -->
+  <g fill="#2563b8">
+    <rect x="238" y="52" width="26" height="18" rx="4"/>
+    <rect x="335" y="52" width="26" height="18" rx="4"/>
+    <rect x="465" y="52" width="26" height="18" rx="4"/>
+  </g>
+  <g font-size="11" fill="#ffffff" text-anchor="middle">
+    <text x="251" y="65">opt</text>
+    <text x="348" y="65">opt</text>
+    <text x="478" y="65">opt</text>
+  </g>
+
+  <!-- brackets under the strip -->
+  <g fill="none" stroke="#8c939b" stroke-width="1.2">
+    <path d="M28,86 V92 H224 V86"/>
+    <path d="M232,86 V92 H551 V86"/>
+    <path d="M559,86 V92 H772 V86"/>
+  </g>
+  <g font-size="12.5" fill="#6a6f76" text-anchor="middle">
+    <text x="126" y="108">instruction</text>
+    <text x="391" y="108">options</text>
+    <text x="665" y="108">text</text>
+  </g>
+
+  <!-- BAND 2: the model reads the line once -->
+  <text x="24" y="134" font-size="12.5" font-weight="bold" fill="#6a6f76">2. The model reads the line once</text>
+
+  <rect x="24" y="142" width="752" height="64" rx="8" fill="#e7effa" stroke="#2563b8" stroke-width="1.2"/>
+
+  <!-- arrows from each marker, through the model, to its score -->
+  <g fill="none" stroke="#2563b8" stroke-width="2" marker-end="url(#arrow-blue)">
+    <line x1="251" y1="70" x2="251" y2="226"/>
+    <line x1="348" y1="70" x2="348" y2="258"/>
+    <line x1="478" y1="70" x2="478" y2="284"/>
+  </g>
+
+  <rect x="80" y="161" width="640" height="25" fill="#e7effa"/>
+  <text x="400" y="179" font-size="15" fill="#1f2328" text-anchor="middle">ModernBERT reads the whole line at once (every word can look at every other word)</text>
+
+  <!-- BAND 3: one score per marker, turned into percentages -->
+  <g font-size="12.5" font-weight="bold" fill="#6a6f76">
+    <text x="24" y="258">3. One score per marker,</text>
+    <text x="24" y="276">turned into percentages</text>
+  </g>
+
+  <rect x="239" y="230" width="24" height="72" rx="3" fill="#2563b8"/>
+  <rect x="336" y="262" width="24" height="40" rx="3" fill="#8fb0dd"/>
+  <rect x="466" y="288" width="24" height="14" rx="3" fill="#8fb0dd"/>
+
+  <path d="M235,308 V314 H494 V308" fill="none" stroke="#8c939b" stroke-width="1.2"/>
+  <text x="364.5" y="331" font-size="12.5" fill="#6a6f76" text-anchor="middle">the same small scorer for every marker</text>
+
+  <!-- turn into percentages -->
+  <g font-size="12.5" fill="#6a6f76" text-anchor="middle">
+    <text x="559" y="236">turn into</text>
+    <text x="559" y="251">percentages</text>
+  </g>
+  <line x1="516" y1="262" x2="602" y2="262" stroke="#57606a" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <rect x="610" y="218" width="166" height="88" rx="8" fill="#ffffff" stroke="#8c939b" stroke-width="1.2"/>
+  <g font-size="15" fill="#1f2328">
+    <text x="624" y="243" font-weight="bold">billing</text>
+    <text x="624" y="267">bug report</text>
+    <text x="624" y="291">praise</text>
+  </g>
+  <g font-size="15" fill="#1f2328" text-anchor="end">
+    <text x="762" y="243" font-weight="bold">93%</text>
+    <text x="762" y="267">7%</text>
+    <text x="762" y="291">under 1%</text>
+  </g>
+</svg>

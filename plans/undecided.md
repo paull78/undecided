@@ -6,7 +6,7 @@
 > **Closed on 2026-10-14.** Interest in Jev-style classifiers had dropped, so the project was
 > wrapped up after Phase 4b as a learning project, followed by one "closing day" of unattended
 > experiments that covered most of phases 5 to 9 (see the table and the Closing day section).
-> Phase 10, the cloud run, was not done. The README is the write-up.
+> Phase 10, the cloud run, was not done. The write-up is [REPORT.md](../REPORT.md); README.md is a short overview for newcomers.
 
 ## Progress
 
@@ -305,7 +305,7 @@ more epoch (1,875 steps, about 17 minutes each) with seed 0, so their evaluation
 - `poc-warm`, the control: `poc`'s own six tasks, no recasting.
 
 The warm start removed the stall: at step 200 the six original tasks were far below chance, and
-QNLI and QQP started learning within 400 steps. The comparison (full tables in the README):
+QNLI and QQP started learning within 400 steps. The comparison (full tables in REPORT.md):
 
 | | `poc` | `poc-warm` | `diverse-warm` |
 |---|---|---|---|

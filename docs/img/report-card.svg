@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="398" viewBox="0 0 800 398" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#57606a"/>
+    </marker>
+  </defs>
+  <rect x="0.5" y="0.5" width="799" height="397" rx="14" fill="#fbfbf9" stroke="#e3e3dc"/>
+
+  <!-- Title and legend -->
+  <text x="24" y="36" font-size="18" font-weight="bold" fill="#1f2328">Right answers out of 10</text>
+  <g font-size="15" fill="#1f2328">
+    <rect x="560" y="24" width="14" height="14" rx="3" fill="#2563b8"/>
+    <text x="580" y="36">undecided</text>
+    <rect x="676" y="24" width="14" height="14" rx="3" fill="#178a68"/>
+    <text x="696" y="36">public model</text>
+  </g>
+
+  <!-- Gridlines at 0, 5, 10 (x = 280 + 46 per point) -->
+  <g stroke="#eef0f2" stroke-width="1.5">
+    <line x1="280" y1="76" x2="280" y2="318"/>
+    <line x1="510" y1="76" x2="510" y2="250"/>
+    <line x1="510" y1="272" x2="510" y2="318"/>
+    <line x1="740" y1="76" x2="740" y2="318"/>
+  </g>
+
+  <!-- Row 1 (top 64) -->
+  <text x="24" y="78" font-size="15" font-weight="bold" fill="#1f2328">Tasks it trained on</text>
+  <g font-size="12.5" fill="#6a6f76">
+    <text x="24" y="97">news topics, emotions, banking</text>
+    <text x="24" y="113">requests, question types,</text>
+    <text x="24" y="129">sentiment</text>
+  </g>
+  <rect x="280" y="84" width="377.2" height="16" rx="3" fill="#2563b8"/>
+  <rect x="280" y="106" width="326.6" height="16" rx="3" fill="#178a68"/>
+
+  <!-- Row 2 (top 160) -->
+  <text x="24" y="174" font-size="15" font-weight="bold" fill="#1f2328">New options</text>
+  <g font-size="12.5" fill="#6a6f76">
+    <text x="24" y="193">60 kinds of voice-assistant</text>
+    <text x="24" y="209">request it never saw</text>
+  </g>
+  <rect x="280" y="180" width="193.2" height="16" rx="3" fill="#2563b8"/>
+  <rect x="280" y="202" width="322" height="16" rx="3" fill="#178a68"/>
+  <line x1="287.8" y1="160" x2="287.8" y2="177" stroke="#6a6f76" stroke-width="1.5" stroke-dasharray="5 4"/>
+  <text x="294" y="170" font-size="12.5" fill="#6a6f76">guessing: 1 in 60</text>
+
+  <!-- Row 3 (top 256) -->
+  <text x="24" y="270" font-size="15" font-weight="bold" fill="#1f2328">New kinds of task</text>
+  <g font-size="12.5" fill="#6a6f76">
+    <text x="24" y="289">irony, spam, hate speech,</text>
+    <text x="24" y="305">opinion or description</text>
+  </g>
+  <rect x="280" y="276" width="257.6" height="16" rx="3" fill="#2563b8"/>
+  <rect x="280" y="298" width="326.6" height="16" rx="3" fill="#178a68"/>
+  <line x1="569.8" y1="271" x2="569.8" y2="320" stroke="#6a6f76" stroke-width="1.5" stroke-dasharray="5 4"/>
+  <text x="569.8" y="266" font-size="12.5" fill="#6a6f76" text-anchor="middle">always picking the most common answer: 6.3</text>
+
+  <!-- Value labels -->
+  <g font-size="14" font-weight="bold" fill="#1f2328">
+    <text x="664" y="97">8.2</text>
+    <text x="613" y="119">7.1</text>
+    <text x="480" y="193">4.2</text>
+    <text x="609" y="215">7.0</text>
+    <text x="542" y="289">5.6</text>
+    <text x="613" y="311">7.1</text>
+  </g>
+
+  <!-- Tick labels -->
+  <g font-size="12.5" fill="#6a6f76" text-anchor="middle">
+    <text x="280" y="336">0</text>
+    <text x="510" y="336">5</text>
+    <text x="740" y="336">10</text>
+  </g>
+
+  <!-- Footnote -->
+  <g font-size="12.5" fill="#6a6f76">
+    <text x="24" y="362">The public model's training data includes the voice-assistant set and some spam and hate-speech data.</text>
+    <text x="24" y="379">Irony and the opinion set are new to both models.</text>
+  </g>
+</svg>

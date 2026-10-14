@@ -1,0 +1,92 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="416" viewBox="0 0 800 416" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#57606a"/>
+    </marker>
+  </defs>
+
+  <rect x="0.5" y="0.5" width="799" height="415" rx="14" fill="#fbfbf9" stroke="#e3e3dc"/>
+
+  <!-- lane 3 highlight -->
+  <rect x="10" y="270" width="780" height="104" rx="10" fill="#eef4fc"/>
+
+  <!-- lane separators -->
+  <g stroke="#e3e3dc" stroke-width="1">
+    <line x1="16" y1="114.5" x2="784" y2="114.5"/>
+    <line x1="16" y1="266.5" x2="784" y2="266.5"/>
+  </g>
+
+  <!-- ============ LANE 1: Fixed list ============ -->
+  <text x="24" y="38" font-size="17" font-weight="bold" fill="#1f2328">Fixed list</text>
+
+  <rect x="24" y="62" width="60" height="34" rx="8" fill="#ffffff" stroke="#8c939b"/>
+  <text x="54" y="84" font-size="15" fill="#1f2328" text-anchor="middle">text</text>
+
+  <path d="M92,79 L128,79" fill="none" stroke="#57606a" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <rect x="136" y="57" width="290" height="44" rx="8" fill="#eef0f2" stroke="#8c939b"/>
+  <text x="152" y="84" font-size="15" fill="#1f2328">billing, bug report, praise</text>
+  <!-- padlock -->
+  <path d="M398,77 v-5 a6,6 0 0 1 12,0 v5" fill="none" stroke="#6a6f76" stroke-width="2.5"/>
+  <rect x="393" y="76" width="22" height="16" rx="3" fill="#6a6f76"/>
+  <circle cx="404" cy="83" r="2.2" fill="#eef0f2"/>
+
+  <g font-size="15" fill="#1f2328">
+    <text x="540" y="36">New options mean</text>
+    <text x="540" y="55">training again</text>
+  </g>
+  
+
+  <!-- ============ LANE 2: One read per option ============ -->
+  <text x="24" y="142" font-size="17" font-weight="bold" fill="#1f2328">One read per option (most public models that take any options)</text>
+
+  <g font-size="15" fill="#1f2328" text-anchor="middle">
+    <rect x="24" y="156" width="170" height="30" rx="8" fill="#ffffff" stroke="#8c939b"/>
+    <text x="109" y="176">text + billing</text>
+    <rect x="24" y="190" width="170" height="30" rx="8" fill="#ffffff" stroke="#8c939b"/>
+    <text x="109" y="210">text + bug report</text>
+    <rect x="24" y="224" width="170" height="30" rx="8" fill="#ffffff" stroke="#8c939b"/>
+    <text x="109" y="244">text + praise</text>
+  </g>
+
+  <g fill="none" stroke="#57606a" stroke-width="2">
+    <path d="M200,171 L232,171" marker-end="url(#arrow)"/>
+    <path d="M200,205 L232,205" marker-end="url(#arrow)"/>
+    <path d="M200,239 L232,239" marker-end="url(#arrow)"/>
+  </g>
+
+  <g fill="#e2f3ec" stroke="#178a68" stroke-width="2">
+    <rect x="241" y="156" width="76" height="30" rx="8"/>
+    <rect x="241" y="190" width="76" height="30" rx="8"/>
+    <rect x="241" y="224" width="76" height="30" rx="8"/>
+  </g>
+  <g font-size="15" fill="#178a68" text-anchor="middle">
+    <text x="279" y="176">model</text>
+    <text x="279" y="210">model</text>
+    <text x="279" y="244">model</text>
+  </g>
+
+  <text x="336" y="210" font-size="15" fill="#6a6f76">... x 50</text>
+
+  <text x="540" y="180" font-size="15" fill="#1f2328">50 options = 50 reads</text>
+  <rect x="540" y="192" width="232" height="26" rx="4" fill="#178a68"/>
+  <text x="762" y="210" font-size="15" font-weight="bold" fill="#ffffff" text-anchor="end">116 ms</text>
+
+  <!-- ============ LANE 3: One read for all options ============ -->
+  <text x="24" y="296" font-size="17" font-weight="bold" fill="#1f2328">One read for all options (undecided)</text>
+
+  <rect x="24" y="316" width="306" height="34" rx="8" fill="#ffffff" stroke="#8c939b"/>
+  <text x="177" y="338" font-size="15" fill="#1f2328" text-anchor="middle">text + billing + bug report + praise</text>
+
+  <path d="M338,333 L374,333" fill="none" stroke="#57606a" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <rect x="382" y="314" width="112" height="38" rx="8" fill="#2563b8"/>
+  <text x="438" y="338" font-size="15" font-weight="bold" fill="#ffffff" text-anchor="middle">undecided</text>
+
+  <text x="540" y="308" font-size="15" fill="#1f2328">50 options = 1 read</text>
+  <rect x="540" y="320" width="46" height="26" rx="4" fill="#2563b8"/>
+  <text x="596" y="338" font-size="15" font-weight="bold" fill="#2563b8">23 ms</text>
+
+  <!-- footnote -->
+  <text x="24" y="400" font-size="12.5" fill="#6a6f76">Time for one request with 50 options, on an Apple M4 Pro laptop GPU.</text>
+</svg>
