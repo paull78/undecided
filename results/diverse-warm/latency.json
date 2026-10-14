@@ -1,0 +1,48 @@
+{
+  "checkpoint": "runs/diverse-warm",
+  "machine": "macOS-26.5-arm64-arm-64bit",
+  "torch": "2.14.0",
+  "text_words": 20,
+  "devices": {
+    "mps": [
+      {
+        "options": 2,
+        "requests": 100,
+        "p50_ms": 9.2,
+        "p95_ms": 10.5
+      },
+      {
+        "options": 10,
+        "requests": 100,
+        "p50_ms": 11.6,
+        "p95_ms": 13.0
+      },
+      {
+        "options": 50,
+        "requests": 100,
+        "p50_ms": 23.2,
+        "p95_ms": 25.4
+      }
+    ],
+    "cpu": [
+      {
+        "options": 2,
+        "requests": 100,
+        "p50_ms": 18.7,
+        "p95_ms": 19.5
+      },
+      {
+        "options": 10,
+        "requests": 100,
+        "p50_ms": 28.7,
+        "p95_ms": 29.8
+      },
+      {
+        "options": 50,
+        "requests": 100,
+        "p50_ms": 49.5,
+        "p95_ms": 54.5
+      }
+    ]
+  }
+}

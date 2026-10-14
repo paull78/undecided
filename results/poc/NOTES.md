@@ -85,9 +85,13 @@ Subjectivity ranks clearly below chance (AUC 0.37). The label mapping was checke
 objective sentences are plot summaries full of charged words ("villainous pirates", "horrifying
 murders", "grief"), and the model takes emotional vocabulary for opinion.
 
-Next is a retrain with more varied task types (Phase 4b, step 2). The reasoning, the rejected
-alternatives and the proposed datasets are in
-[the plan](../../plans/undecided.md#phase-4b-unseen-task-types).
+The AUCs in this table were computed with the options in a fixed order ("not spam, spam").
+`metrics.json`, added later, scores them with the shuffled order of the evaluation sets, which
+gives slightly different values (spam 0.65, irony 0.46, hate speech 0.52, subjectivity 0.40):
+with packed options, the order is part of the input.
+
+The retrain with more varied task types that followed (Phase 4b, step 2) did not fix this. The
+outcome is in [the plan](../../plans/undecided.md#phase-4b-unseen-task-types) and the README.
 
 ### Position of the correct option
 

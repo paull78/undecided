@@ -1,7 +1,12 @@
 # Plan: undecided
 
 > Source PRD: [README.md](../README.md). "Q1" to "Q5" are the five questions in *The idea*,
-> "M0" to "M7" are the milestones.
+> "M0" to "M7" are the milestones of the original README.
+
+> **Closed on 2026-10-14.** Interest in Jev-style classifiers had dropped, so the project was
+> wrapped up after Phase 4b as a learning project. Phases 1 to 4b are done; phases 5 to 11 were
+> not run, apart from the parts listed in the table. The README is now the write-up, with the
+> results, takeaways and the ideas these phases would have tested.
 
 ## Progress
 
@@ -11,9 +16,14 @@
 | 2. `classify()` on any checkpoint | done 2026-09-29: save/load, `classify()`, CLI; `cuda` untested | `12815bb` |
 | 3. All training data and the first real run | done 2026-09-29: in-distribution accuracy 0.48 to 0.88, [notes](../results/poc/NOTES.md) | `9f61d0b` |
 | 4. Held-out evaluation | done 2026-09-29: Yahoo 0.469, MASSIVE 0.325 (60 options), irony 0.446, below chance; M3 exit partly met | `1a8b3bc` |
-| 4b. Unseen task types | step 1 done 2026-10-02 (`4d2bf01`): all four unseen task types fail (AUC 0.37 to 0.56); step 2 first attempt stuck at chance and stopped; cause found (diluted many-option tasks), fix to choose | |
-| 5. Calibration | after 4b | |
-| 6 to 11 | not started | |
+| 4b. Unseen task types | done 2026-10-14: unseen task types fail in general; the diverse mix stalled from scratch (diluted many-option tasks) and, warm-started, did not help unseen tasks against a control | `4d2bf01`, `9ade41a`, `bb4e586` |
+| 5. Calibration | partly: calibration error and mean confidence for every dataset; temperature scaling not run | `bb4e586` |
+| 6. Latency | partly: single-request p50/p95 at 2, 10 and 50 options on MPS and CPU | closing commit |
+| 7. Baselines | not done, project closed | |
+| 8. Encoder ablations | not done, project closed | |
+| 9. Design ablations | not done, project closed | |
+| 10. Optional full run in the cloud | not done, project closed | |
+| 11. Write-up | done 2026-10-14: README rewritten as the write-up | closing commit |
 
 ## Architectural decisions
 
@@ -280,8 +290,38 @@ level, ln(number of options):
 Cause: the diverse mix diluted the many-option examples that start learning. Multi-option
 banking77 went from 1 in 6 training examples (5,000 of 30,000) to 1 in 13 (3,000, a quarter of
 them recast to yes/no), and TREC the same. In the diverse probe banking77 never left chance (1.69
-against 1.68 at step 1,000). This also explains the "slow start" seen in the tracer and in `poc`:
-it is the time to discover word matching between options and text.
+against 1.68 at step 1,000). This also explains the long flat start of `poc`: it is the time
+to discover word matching between options and text. (The tracer's slow start, on AG News alone,
+is not explained by this.)
+
+### Step 2, second attempt (2026-10-14): warm start, against a control
+
+Two runs start from the `poc` checkpoint, which already matches options to text, and train one
+more epoch (1,875 steps, about 17 minutes each) with seed 0, so their evaluation samples match
+`poc` exactly:
+
+- `diverse-warm`: the ten-task mix with `recast_rate` 0.25.
+- `poc-warm`, the control: `poc`'s own six tasks, no recasting.
+
+The warm start removed the stall: at step 200 the six original tasks were far below chance, and
+QNLI and QQP started learning within 400 steps. The comparison (full tables in the README):
+
+| | `poc` | `poc-warm` | `diverse-warm` |
+|---|---|---|---|
+| Six training tasks, mean accuracy | 0.709 | 0.782 | 0.752 |
+| Yahoo and MASSIVE, mean accuracy | 0.397 | 0.450 | 0.425 |
+| Four unseen task types, mean macro-F1 | 0.462 | 0.455 | 0.429 |
+| Four unseen task types, mean AUC | 0.51 | 0.52 | 0.51 |
+
+Task diversity at this scale did not help unseen task types, and the control was better on
+everything else. `diverse-warm`'s higher irony accuracy (0.614) is majority-class drift: it
+answers "not ironic" for 88% of tweets, "not spam" for every message and "not hate speech" for
+95%. Of the new training tasks, QNLI (AUC 0.89) and QQP (0.83) were learned, BoolQ weakly (0.65),
+CoLA not at all (0.49, majority answer every time). An observation made mid-run, that the pair
+tasks helped MNLI, turned out wrong: the control reached the same MNLI accuracy (0.608).
+
+Decision: `poc-warm` is the final checkpoint, and the project closes here instead of moving to
+Phase 5.
 
 ### Acceptance criteria
 
@@ -289,8 +329,8 @@ it is the time to discover word matching between options and text.
 - [x] `results/poc/metrics.json` has all six held-out datasets, with majority baselines next to
       chance in the notes
 - [x] A written outcome for step 1: irony outlier or general failure, and whether step 2 runs
-- [ ] If step 2 runs: a new run with its own results folder, compared with `poc` on every
-      dataset, and the decision on which checkpoint Phase 5 uses
+- [x] If step 2 runs: a new run with its own results folder, compared with `poc` on every
+      dataset, and the decision on which checkpoint Phase 5 uses (`poc-warm`; Phase 5 not run)
 
 ---
 
