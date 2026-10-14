@@ -60,3 +60,30 @@ def test_extra_orders_are_permutations_that_keep_the_answer():
     assert all(sorted(r.options) == sorted(base.options) for r in orders)
     assert all(r.options[r.answer_idx] == "c" for r in orders)
     assert len({tuple(r.options) for r in orders}) > 5
+
+
+def test_a_distractor_is_added_at_a_random_position_without_moving_the_answer():
+    import random
+
+    from undecided.probe import with_distractor
+
+    base = Record("", "text", ["a", "b", "c"], 1, "test", "train")
+    rng = random.Random(0)
+    out = [with_distractor(base, "weather forecast", rng) for _ in range(30)]
+
+    assert all(len(r.options) == 4 and "weather forecast" in r.options for r in out)
+    assert all(r.options[r.answer_idx] == "b" for r in out)
+    assert len({r.options.index("weather forecast") for r in out}) == 4  # every position used
+
+
+def test_accuracy_is_split_by_whether_the_gold_label_has_a_training_counterpart():
+    from undecided.probe import accuracy_by_overlap
+
+    records = [Record("", "t", ["sports", "health"], 0, "y", "heldout_labels"),   # overlapping class, right
+               Record("", "t", ["sports", "health"], 0, "y", "heldout_labels"),   # overlapping class, wrong
+               Record("", "t", ["sports", "health"], 1, "y", "heldout_labels")]   # new class, right
+    probs = [[0.9, 0.1], [0.2, 0.8], [0.3, 0.7]]
+
+    split = accuracy_by_overlap(records, probs, overlapping={"sports"})
+
+    assert split == {"overlapping": {"n": 2, "accuracy": 0.5}, "new": {"n": 1, "accuracy": 1.0}}

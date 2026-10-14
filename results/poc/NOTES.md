@@ -81,9 +81,10 @@ fine until the majority baseline (0.851) and macro-F1 (0.511) are next to it: it
 nothing spam.
 
 Subjectivity ranks clearly below chance (AUC 0.37). The label mapping was checked (0 is
-"objective" in the dataset's own label names). A plausible reading, not tested: SUBJ's
-objective sentences are plot summaries full of charged words ("villainous pirates", "horrifying
-murders", "grief"), and the model takes emotional vocabulary for opinion.
+"objective" in the dataset's own label names). The explanation first offered here, that SUBJ's
+objective plot summaries carry charged words the model reads as opinion, was later tested and is
+wrong: objective sentences carry less sentiment intensity, not more (see the plan's Review
+follow-ups).
 
 The AUCs in this table were computed with the options in a fixed order ("not spam, spam").
 `metrics.json`, added later, scores them with the shuffled order of the evaluation sets, which

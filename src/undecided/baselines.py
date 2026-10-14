@@ -103,7 +103,9 @@ def main() -> None:
     device = pick_device()
     cap_device_memory(device)
     tokenizer = AutoTokenizer.from_pretrained(MODEL)
-    model = AutoModelForSequenceClassification.from_pretrained(MODEL).to(device).eval()
+    # The checkpoint is stored in bfloat16 and transformers keeps that by default; undecided runs in
+    # float32, so the baseline does too (bfloat16 made it about 1.8 times slower on CPU).
+    model = AutoModelForSequenceClassification.from_pretrained(MODEL, dtype=torch.float32).to(device).eval()
     out = Path("results") / NAME
     out.mkdir(parents=True, exist_ok=True)
     partial = out / "metrics.partial.json"

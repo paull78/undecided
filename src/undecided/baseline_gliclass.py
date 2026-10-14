@@ -39,9 +39,16 @@ NAME = "gliclass"
 
 
 def make_pipeline(device: str):
-    return ZeroShotClassificationPipeline(GLiClassModel.from_pretrained(MODEL), AutoTokenizer.from_pretrained(MODEL),
+    pipe = ZeroShotClassificationPipeline(GLiClassModel.from_pretrained(MODEL), AutoTokenizer.from_pretrained(MODEL),
                                           classification_type="multi-label", device=device, max_classes=100,
                                           progress_bar=False)
+    # The inner pipeline only honours "cuda" devices and silently falls back to the CPU otherwise,
+    # so move it explicitly and check (an earlier run reported MPS timings that were CPU timings).
+    pipe.pipe.device = torch.device(device)
+    pipe.pipe.model.to(device=device, dtype=torch.float32)  # float32, as undecided and the NLI baseline
+    actual = next(pipe.pipe.model.parameters()).device.type
+    assert actual == torch.device(device).type, f"GLiClass is on {actual}, not {device}"
+    return pipe
 
 
 def predict(pipe, records: list[Record], instruction: str | None, batch_size: int = 16) -> list[list[float]]:

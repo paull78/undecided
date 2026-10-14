@@ -4,9 +4,9 @@
 > "M0" to "M7" are the milestones of the original README.
 
 > **Closed on 2026-10-14.** Interest in Jev-style classifiers had dropped, so the project was
-> wrapped up after Phase 4b as a learning project. Phases 1 to 4b are done; phases 5 to 11 were
-> not run, apart from the parts listed in the table. The README is now the write-up, with the
-> results, takeaways and the ideas these phases would have tested.
+> wrapped up after Phase 4b as a learning project, followed by one "closing day" of unattended
+> experiments that covered most of phases 5 to 9 (see the table and the Closing day section).
+> Phase 10, the cloud run, was not done. The README is the write-up.
 
 ## Progress
 
@@ -17,13 +17,13 @@
 | 3. All training data and the first real run | done 2026-09-29: in-distribution accuracy 0.48 to 0.88, [notes](../results/poc/NOTES.md) | `9f61d0b` |
 | 4. Held-out evaluation | done 2026-09-29: Yahoo 0.469, MASSIVE 0.325 (60 options), irony 0.446, below chance; M3 exit partly met | `1a8b3bc` |
 | 4b. Unseen task types | done 2026-10-14: unseen task types fail in general; the diverse mix stalled from scratch (diluted many-option tasks) and, warm-started, did not help unseen tasks against a control | `4d2bf01`, `9ade41a`, `bb4e586` |
-| 5. Calibration | partly: calibration error and mean confidence for every dataset; temperature scaling not run | `bb4e586` |
-| 6. Latency | partly: single-request p50/p95 at 2, 10 and 50 options on MPS and CPU | closing commit |
-| 7. Baselines | not done, project closed | |
-| 8. Encoder ablations | not done, project closed | |
-| 9. Design ablations | not done, project closed | |
+| 5. Calibration | done 2026-10-14 (closing day, step B): calibration error everywhere; temperature scaling global against per-dataset | `bb4e586`, `37e234e` |
+| 6. Latency | done 2026-10-14: single-request p50/p95 at 2, 10 and 50 options on MPS and CPU, baselines included | `5229db4`, `0627af3` |
+| 7. Baselines | done 2026-10-14 (closing day, step F): NLI zero-shot model and GLiClass on the same evaluation sets | `0627af3`, `ff7023b` |
+| 8. Encoder ablations | done 2026-10-14 (closing day, steps D and E): head only and LoRA | `fc303bf`, `697a523` |
+| 9. Design ablations | partly (closing day, steps A and C): instruction probe and option-order averaging; no-shuffle, option-count and pooling ablations not run | `3324ba5`, `37e234e` |
 | 10. Optional full run in the cloud | not done, project closed | |
-| 11. Write-up | done 2026-10-14: README rewritten as the write-up | closing commit |
+| 11. Write-up | done 2026-10-14: README rewritten as the write-up, then shortened after a reader-panel review | `5229db4`, `0e46004` |
 | Closing day | done 2026-10-14: steps 0 to H; README updated | closing-day commits |
 
 ## Architectural decisions
@@ -239,7 +239,7 @@ So irony is not an outlier: the model learned its six training task types, not t
 instruction for a new one. Subjectivity ranks clearly *below* chance; the label mapping was
 checked (0 is "objective"), and a plausible reading is that SUBJ's objective sentences are plot
 summaries full of charged words ("villainous", "horrifying murders"), which the model takes for
-opinion. Step 2 runs.
+opinion (later tested and refuted, see Review follow-ups). Step 2 runs.
 
 ### Step 2: task diversity (one retrain, about an hour)
 
@@ -561,6 +561,47 @@ true only on the GPU, and subjectivity "below chance in every model" where LoRA 
 Writing up also surfaced the NLI baseline's training mix, recorded under step F.
 
 Rough total: about 10.5 hours, of which about 3.5 are compute.
+
+---
+
+## Review follow-ups (2026-10-14)
+
+After the closing day, five reader personas reviewed the README as a portfolio piece (recruiter
+5/10, staff engineer 7, GitHub visitor 7.5, ML hiring manager 8, skeptical researcher 8). Their
+questions were answered with measurements where possible:
+
+- **Yahoo label overlap.** 4 of Yahoo's 10 classes have AG News counterparts (Sports, Business &
+  Finance, Science & Mathematics, Computers & Internet). `poc-warm` scores 0.575 on those (393
+  examples) and 0.415 on the other 6 classes (607 examples), so the new-label result holds at
+  about 4 times chance on classes with no counterpart. MASSIVE stays the cleaner case.
+- **Distractor option.** Adding "recipe for pancakes" to every example changes the choice among
+  the original options for 1.4% (emotion) to 14.4% (irony) of examples, and the distractor
+  itself wins 0% to 7.2% of the time (SST-2). Options do influence each other, mostly on weak
+  tasks. `results/poc-warm/probe-distractor.json`.
+- **Subjectivity explanation, refuted.** The README said SUBJ's "objective" plot summaries carry
+  charged words the model reads as opinion. Measured with the model's own sentiment confidence,
+  objective sentences are *less* intense (0.54 against 0.69), and intensity correlates slightly
+  negatively with P(subjective) (-0.14). The inverted ranking is unexplained. GLiClass (AUC 0.96)
+  and the NLI baseline rank the same records correctly, which rules out a label-mapping bug.
+- **Frozen bi-encoder.** Plain ModernBERT-base mean-pooled embeddings with cosine similarity, no
+  training: near chance on most datasets (AG News 0.265, Yahoo 0.101, TREC 0.004), with some
+  signal on MASSIVE (0.101, 6 times chance) and subjectivity (AUC 0.71). So the "encoder must
+  learn" claim is scoped: frozen features carry little usable signal, and the frozen `<opt>`
+  readout of head-only carries none.
+- **Baseline setup bugs.** GLiClass never ran on the GPU: its inner pipeline honours only "cuda"
+  and fell back to the CPU, so its "MPS" timings were CPU timings and its metrics said "mps".
+  The NLI baseline loaded in bfloat16 (its checkpoint's type), about 1.8 times slower on CPU than
+  the float32 `undecided`. Both runners now load float32 on the requested device, and both
+  baselines were re-run: accuracy moved by at most 0.007; NLI latency became 23.6, 25.9 and
+  115.5 ms on MPS and 27.1, 51.4 and 174.7 on CPU at 2, 10 and 50 options (from 77.6, 362 and
+  1,645 on CPU); GLiClass on MPS is 8.3, 11.8 and 25.6 ms, as fast as `undecided`.
+- **Confidence intervals.** 95% intervals from the binomial and Hanley-McNeil approximations
+  (`src/undecided/stats.py`), treating models as independent: conservative for paired
+  comparisons. The README's summary table carries them.
+- **Seed variance.** The second seed re-ran only the final warm step, so its spread is a lower
+  bound on the variance of the full pipeline.
+- **Model selection.** `poc-warm` was chosen on the same evaluation sets it is reported on; with
+  differences inside seed noise this changes nothing, but there is no separate validation split.
 
 ---
 

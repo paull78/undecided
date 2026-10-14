@@ -1,0 +1,42 @@
+{
+  "ag_news": {
+    "n": 1000,
+    "accuracy": 0.899,
+    "accuracy_with_distractor": 0.893,
+    "distractor_chosen": 0.003,
+    "choice_changed": 0.026,
+    "mean_distractor_probability": 0.008774945381617726
+  },
+  "emotion": {
+    "n": 1000,
+    "accuracy": 0.901,
+    "accuracy_with_distractor": 0.899,
+    "distractor_chosen": 0.0,
+    "choice_changed": 0.014,
+    "mean_distractor_probability": 0.00038033144459927827
+  },
+  "sst2": {
+    "n": 872,
+    "accuracy": 0.8577981651376146,
+    "accuracy_with_distractor": 0.8061926605504587,
+    "distractor_chosen": 0.07224770642201835,
+    "choice_changed": 0.02981651376146789,
+    "mean_distractor_probability": 0.14276471095831975
+  },
+  "yahoo_answers": {
+    "n": 1000,
+    "accuracy": 0.478,
+    "accuracy_with_distractor": 0.456,
+    "distractor_chosen": 0.053,
+    "choice_changed": 0.07,
+    "mean_distractor_probability": 0.05153916950278676
+  },
+  "tweet_irony": {
+    "n": 784,
+    "accuracy": 0.47831632653061223,
+    "accuracy_with_distractor": 0.4604591836734694,
+    "distractor_chosen": 0.061224489795918366,
+    "choice_changed": 0.1441326530612245,
+    "mean_distractor_probability": 0.10566836717949553
+  }
+}
