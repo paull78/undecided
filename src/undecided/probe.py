@@ -3,12 +3,15 @@
     uv run python -m undecided.probe instructions configs/poc-warm.yaml
     uv run python -m undecided.probe calibration configs/poc-warm.yaml
     uv run python -m undecided.probe orders configs/poc-warm.yaml
+    uv run python -m undecided.probe examples configs/poc-warm.yaml
 
 instructions: does the model read the instruction? Scores every dataset with its canonical
 instruction, with none, and with another dataset's canonical instruction.
 
 orders: option-order averaging. Scores every example under 4 option orders, then averages each
 option's probability across them.
+
+examples: the five hand-written prompts shown in the README, with every option's probability.
 
 calibration: temperature scaling. A global T is fitted on fresh samples of the training datasets
 (rows used neither for training nor for evaluation) and applied to every dataset; a per-dataset T
@@ -229,7 +232,29 @@ def plot_reliability(eval_sets: dict[str, list], probs: dict, global_t: float, p
     fig.savefig(path, dpi=140, facecolor="#fcfcfb")
 
 
-PROBES = {"instructions": probe_instructions, "calibration": probe_calibration, "orders": probe_orders}
+EXAMPLES = [
+    ("NASA's rover found traces of water beneath the Martian surface.",
+     ["space exploration", "cooking", "football", "stock market"], None),
+    ("The striker scored twice in the second half.", ["space exploration", "cooking", "football", "stock market"], None),
+    ("My card was charged twice.", ["billing", "bug report", "praise"], "Classify the support ticket."),
+    ("I absolutely loved this film, the acting was superb.", ["positive", "negative"], None),
+    ("The app crashes every time I open the settings page.", ["billing", "bug report", "praise"],
+     "Classify the support ticket."),
+]
+
+
+def probe_examples(model: Undecided, raw: dict, eval_sets: dict[str, list], out_dir: Path) -> list:
+    report = []
+    for text, options, instruction in EXAMPLES:
+        probs = model.classify(text, options, instruction)
+        report.append({"text": text, "options": options, "instruction": instruction, "probabilities": probs})
+        best = max(probs, key=probs.get)
+        print(f"{text[:50]:50s} {best} {probs[best]:.1%}", flush=True)
+    return report
+
+
+PROBES = {"instructions": probe_instructions, "calibration": probe_calibration, "orders": probe_orders,
+          "examples": probe_examples}
 
 
 def main() -> None:

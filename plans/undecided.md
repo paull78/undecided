@@ -24,7 +24,7 @@
 | 9. Design ablations | not done, project closed | |
 | 10. Optional full run in the cloud | not done, project closed | |
 | 11. Write-up | done 2026-10-14: README rewritten as the write-up | closing commit |
-| Closing day | started 2026-10-14: steps 0 to F done; G running | |
+| Closing day | done 2026-10-14: steps 0 to H; README updated | closing-day commits |
 
 ## Architectural decisions
 
@@ -395,7 +395,7 @@ it.
 
 - [x] Instruction variants in the evaluation path, with a test that the variant is applied
 - [x] A table: accuracy and AUC per dataset under the three variants
-- [ ] One paragraph in the README findings (step H)
+- [x] One paragraph in the README findings (step H)
 
 Result (2026-10-14, `results/poc-warm/probe-instructions.json`): the model ignores the
 instruction. On the five single-text training datasets and the two new-label sets, removing it
@@ -423,7 +423,7 @@ Phase 5 as planned, on `poc-warm`: temperature scaling, global against per-datas
       hand-computed values
 - [x] `results/poc-warm/probe-calibration.json` and reliability diagrams in
       `results/poc-warm/plots/reliability.png`
-- [ ] The finding in the README: does global T fix held-out calibration, or only per-dataset T?
+- [x] The finding in the README: does global T fix held-out calibration, or only per-dataset T?
       This is the direct test of the Molas argument. (step H)
 
 Result (2026-10-14): only per-dataset T. Global T = 1.18, fitted on 5,452 examples (1,000 per
@@ -444,7 +444,7 @@ and the cost (4 passes per request).
 
 - [x] An averaging option in the evaluation path, with a test that it averages by option name
 - [x] The comparison table (`results/poc-warm/probe-orders.json`)
-- [ ] The idea moved from "What to try next" to the findings (step H)
+- [x] The idea moved from "What to try next" to the findings (step H)
 
 Result (2026-10-14): averaging 4 orders helps where there are many options and nowhere else.
 Against the mean of the 4 single orders: banking77 0.642 to 0.669 accuracy (calibration error
@@ -481,7 +481,7 @@ ModernBERT within the box.
 - [x] LoRA option in the training config (rank 16 on the attention projections, head and `<opt>`
       vector trained), with a test that only adapter, head and `<opt>` parameters change
 - [x] `configs/lora.yaml`, run, results in `results/lora/`, trainable parameter count recorded
-- [ ] Question 5 answered in the README: full fine-tune against LoRA against head only (step H)
+- [x] Question 5 answered in the README: full fine-tune against LoRA against head only (step H)
 
 Result (2026-10-14): in between, closer to full fine-tuning than to head only. 1,623,553
 trainable parameters (about 1% of the model), 3,750 steps in 16.8 minutes (60 examples per
@@ -507,10 +507,13 @@ much faster is one pass than one pass per option?
 
 - [x] A baseline runner that writes the same `metrics.json` shape, so the results command and
       the chart work unchanged
-- [ ] Baseline rows in the README tables and the chart; latency side by side (step H)
+- [x] Baseline rows in the README tables and the chart; latency side by side (step H)
 
 Result (2026-10-14): the NLI baseline is far stronger on everything `undecided` didn't train on,
-and much slower. `ModernBERT-base-zeroshot-v2.0` (template "This example is {}.", no instruction):
+and much slower. Caveat found while writing up: its model card reports per-dataset results under
+"Training results" for a mix that includes AG News, emotion, banking77, Yahoo topics, MASSIVE, a
+spam dataset and two hate-speech datasets, so on those it is most likely not zero-shot. Irony and
+subjectivity are not in that list. `ModernBERT-base-zeroshot-v2.0` (template "This example is {}.", no instruction):
 Yahoo 0.645 and MASSIVE 0.701 against `poc-warm`'s 0.478 and 0.422; unseen task AUC irony 0.78,
 SMS spam 0.99, subjectivity 0.63, hate speech 0.59 (against 0.53, 0.68, 0.34, 0.54). `undecided`
 wins only on two of its own training datasets, emotion (0.901 against 0.763) and TREC (0.772
@@ -533,15 +536,29 @@ The README warns that one seed per model can't separate small differences. Repea
 `poc-warm` step from `poc` with training seed 1, keeping the evaluation samples fixed (a separate
 evaluation seed), to show how much a second seed moves each number.
 
-- [ ] `eval_seed` in the config, defaulting to `seed` so earlier results reproduce
-- [ ] `configs/poc-warm-seed1.yaml`, run, and the spread reported next to the main table
+- [x] `eval_seed` in the config, defaulting to `seed` so earlier results reproduce (with
+      `data_seed` too, so the training examples stay the same)
+- [x] `configs/poc-warm-seed1.yaml`, run, and the spread reported next to the main table
+
+Result (2026-10-14): a second seed moves group averages by about 0.02 (training tasks 0.816 to
+0.796, new labels 0.450 to 0.428) and single many-option datasets by more (banking77 0.072,
+MASSIVE 0.045). So `poc-warm`'s lead over `diverse-warm` on new labels is within seed noise; the
+large differences (unseen-task failure, head only and LoRA against full fine-tuning, the
+baselines) stand. Unseen task AUC averages 0.51 for the second seed too.
 
 ### Step H: write-up (1 h)
 
-- [ ] README: findings, results tables, chart and questions 3 to 5 updated; "What to try next"
+- [x] README: findings, results tables, chart and questions 3 to 5 updated; "What to try next"
       trimmed to what is still untested
-- [ ] This plan: each step marked done or not done, with the reason; memory updated
-- [ ] Final commit and a notification
+- [x] This plan: each step marked done or not done, with the reason; memory updated
+- [x] Final commit and a notification
+
+Done 2026-10-14. Before committing, a fact-check workflow (4 section checkers, each reported
+issue then tested by an independent refuter) compared every number and claim in the README with
+the results files: 17 issues reported, 16 confirmed and fixed (among them "a quarter of the
+examples" recast where it was 15% overall, an overstated tracer accuracy jump, a latency claim
+true only on the GPU, and subjectivity "below chance in every model" where LoRA sat at chance).
+Writing up also surfaced the NLI baseline's training mix, recorded under step F.
 
 Rough total: about 10.5 hours, of which about 3.5 are compute.
 

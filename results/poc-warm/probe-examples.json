@@ -1,0 +1,74 @@
+[
+  {
+    "text": "NASA's rover found traces of water beneath the Martian surface.",
+    "options": [
+      "space exploration",
+      "cooking",
+      "football",
+      "stock market"
+    ],
+    "instruction": null,
+    "probabilities": {
+      "space exploration": 0.9901136159896851,
+      "cooking": 0.004811456426978111,
+      "football": 0.00250627170316875,
+      "stock market": 0.0025686416774988174
+    }
+  },
+  {
+    "text": "The striker scored twice in the second half.",
+    "options": [
+      "space exploration",
+      "cooking",
+      "football",
+      "stock market"
+    ],
+    "instruction": null,
+    "probabilities": {
+      "space exploration": 0.0003894229594152421,
+      "cooking": 0.00031861255411058664,
+      "football": 0.9991629123687744,
+      "stock market": 0.00012912049714941531
+    }
+  },
+  {
+    "text": "My card was charged twice.",
+    "options": [
+      "billing",
+      "bug report",
+      "praise"
+    ],
+    "instruction": "Classify the support ticket.",
+    "probabilities": {
+      "billing": 0.9258301258087158,
+      "bug report": 0.07245106995105743,
+      "praise": 0.0017187491757795215
+    }
+  },
+  {
+    "text": "I absolutely loved this film, the acting was superb.",
+    "options": [
+      "positive",
+      "negative"
+    ],
+    "instruction": null,
+    "probabilities": {
+      "positive": 0.9882304668426514,
+      "negative": 0.011769588105380535
+    }
+  },
+  {
+    "text": "The app crashes every time I open the settings page.",
+    "options": [
+      "billing",
+      "bug report",
+      "praise"
+    ],
+    "instruction": "Classify the support ticket.",
+    "probabilities": {
+      "billing": 0.003451387397944927,
+      "bug report": 0.9925385117530823,
+      "praise": 0.004010076634585857
+    }
+  }
+]
