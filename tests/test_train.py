@@ -96,3 +96,44 @@ def test_losses_are_summarised_per_source_against_uniform_guessing():
     assert summary["x"]["n"] == 2 and math.isclose(summary["x"]["loss"], 0.3)
     assert math.isclose(summary["x"]["chance"], (math.log(2) + math.log(4)) / 2)
     assert math.isclose(summary["y"]["chance"], math.log(3))
+
+
+def test_a_resumed_run_continues_exactly_where_an_interrupted_one_stopped(tokenizer, tiny_scorer, tmp_path):
+    import copy
+    import random
+
+    import pytest
+    import torch
+
+    from undecided.data import Record
+    from undecided.train import TrainConfig, train
+
+    rng = random.Random(0)
+    words = ["apple", "river", "engine", "violet", "castle", "pepper", "falcon", "marble"]
+    labels = ["world", "sports", "business", "science", "health", "music"]
+    records = [Record("", " ".join(rng.choices(words, k=3 + i % 5)), list(labels), i % 6, "test", "train")
+               for i in range(48)]
+    cfg = TrainConfig(epochs=2, batch_size=8, max_length=64, augment=True, max_options=4)  # 12 steps
+    cpu = torch.device("cpu")
+    initial = copy.deepcopy(tiny_scorer.state_dict())
+
+    uninterrupted = train(tiny_scorer, tokenizer, records, cfg, cpu)
+
+    class Interrupted(Exception):
+        pass
+
+    def stop_at_step_9(step, loss, examples):
+        if step == 9:
+            raise Interrupted
+
+    tiny_scorer.load_state_dict(initial)
+    with pytest.raises(Interrupted):
+        train(tiny_scorer, tokenizer, records, cfg, cpu, on_step=stop_at_step_9,
+              checkpoint=tmp_path / "train-state.pt", checkpoint_every=4)  # last checkpoint: step 8
+
+    tiny_scorer.load_state_dict(initial)  # the resume must come from the file, not from memory
+    resumed = train(tiny_scorer, tokenizer, records, cfg, cpu,
+                    checkpoint=tmp_path / "train-state.pt", checkpoint_every=4, resume=True)
+
+    assert len(uninterrupted) == 12
+    assert resumed == pytest.approx(uninterrupted, rel=1e-5)

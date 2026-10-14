@@ -1,10 +1,12 @@
 """Plain PyTorch training loop."""
 
 import math
-from collections import defaultdict
+import os
 import random
+from collections import defaultdict
 from collections.abc import Callable
 from dataclasses import dataclass
+from pathlib import Path
 
 import torch
 import torch.nn.functional as F
@@ -75,9 +77,22 @@ def loss_by_source(examples: list[tuple[str, float, int]]) -> dict[str, dict]:
     }
 
 
+def _save_state(path: Path, state: dict) -> None:
+    """Write to a temporary file and rename, so an interruption mid-write never leaves a broken file."""
+    tmp = path.with_suffix(".tmp")
+    torch.save(state, tmp)
+    os.replace(tmp, path)
+
+
 def train(scorer: OptionScorer, tokenizer, records: list[Record], cfg: TrainConfig, device: torch.device,
-          on_step: Callable[[int, float, list[tuple[str, float, int]]], None] | None = None) -> None:
-    """on_step gets the step, the batch loss and (source, loss, number of options) per example."""
+          on_step: Callable[[int, float, list[tuple[str, float, int]]], None] | None = None,
+          checkpoint: Path | None = None, checkpoint_every: int = 500, resume: bool = False) -> list[float]:
+    """Train and return the loss of every step.
+
+    on_step gets the step, the batch loss and (source, loss, number of options) per example. With a
+    checkpoint path, the full training state is saved there every checkpoint_every steps; resume=True
+    continues from it with the same batches and augmentation as an uninterrupted run.
+    """
     rng = random.Random(cfg.seed)
     torch.manual_seed(cfg.seed)
     scorer.to(device).train()
@@ -93,11 +108,25 @@ def train(scorer: OptionScorer, tokenizer, records: list[Record], cfg: TrainConf
         lambda step: min((step + 1) / warmup_steps, max(0.0, (total_steps - step) / (total_steps - warmup_steps))),
     )
 
-    step = 0
-    for _ in range(cfg.epochs):
-        for chunk in length_grouped_batches(records, cfg.batch_size, rng):
+    step, start_epoch, skip_batches, losses = 0, 0, 0, []
+    if resume and checkpoint and checkpoint.exists():
+        state = torch.load(checkpoint, map_location="cpu", weights_only=False)
+        scorer.load_state_dict(state["scorer"])
+        optimizer.load_state_dict(state["optimizer"])
+        scheduler.load_state_dict(state["scheduler"])
+        step, start_epoch, skip_batches, losses = state["step"], state["epoch"], state["batch"], state["losses"]
+        rng.setstate(state["epoch_rng"])
+        torch.set_rng_state(state["torch_rng"])
+        if device.type == "mps" and state.get("mps_rng") is not None:
+            torch.mps.set_rng_state(state["mps_rng"])
+
+    for epoch in range(start_epoch, cfg.epochs):
+        epoch_rng = rng.getstate()  # batches and augmentation of this epoch all follow from it
+        for batch_idx, chunk in enumerate(length_grouped_batches(records, cfg.batch_size, rng)):
             if cfg.augment:
                 chunk = [augment(r, rng, cfg.max_options, cfg.recast_rate) for r in chunk]
+            if epoch == start_epoch and batch_idx < skip_batches:
+                continue  # already trained before the interruption; augmenting it kept rng in step
             batch = collate([encode(tokenizer, r, cfg.max_length) for r in chunk], tokenizer.pad_token_id)
             logits = scorer(batch["input_ids"].to(device), batch["attention_mask"].to(device))
             example_losses = F.cross_entropy(logits, batch["labels"].to(device), reduction="none")
@@ -109,8 +138,17 @@ def train(scorer: OptionScorer, tokenizer, records: list[Record], cfg: TrainConf
             optimizer.step()
             scheduler.step()
             step += 1
+            losses.append(loss.item())
+            if checkpoint and step % checkpoint_every == 0 and step < total_steps:
+                _save_state(checkpoint, {
+                    "scorer": scorer.state_dict(), "optimizer": optimizer.state_dict(),
+                    "scheduler": scheduler.state_dict(), "step": step, "epoch": epoch, "batch": batch_idx + 1,
+                    "losses": losses, "epoch_rng": epoch_rng, "torch_rng": torch.get_rng_state(),
+                    "mps_rng": torch.mps.get_rng_state() if device.type == "mps" else None,
+                })
             if on_step:
                 examples = [(r.source, l, len(r.options)) for r, l in zip(chunk, example_losses.tolist())]
-                on_step(step, loss.item(), examples)
+                on_step(step, losses[-1], examples)
             if step == total_steps:
-                return
+                return losses
+    return losses

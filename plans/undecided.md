@@ -24,6 +24,7 @@
 | 9. Design ablations | not done, project closed | |
 | 10. Optional full run in the cloud | not done, project closed | |
 | 11. Write-up | done 2026-10-14: README rewritten as the write-up | closing commit |
+| Closing day | started 2026-10-14: step 0 done, step A next | |
 
 ## Architectural decisions
 
@@ -331,6 +332,151 @@ Phase 5.
 - [x] A written outcome for step 1: irony outlier or general failure, and whether step 2 runs
 - [x] If step 2 runs: a new run with its own results folder, compared with `poc` on every
       dataset, and the decision on which checkpoint Phase 5 uses (`poc-warm`; Phase 5 not run)
+
+---
+
+## Closing day: the questions still open
+
+Added on 2026-10-14, after the write-up, at the user's request: one day of unattended work to
+close the project on stronger evidence. It takes the most informative parts of phases 5 to 8,
+cheapest first, so a stop at any point still leaves finished, committed results.
+
+**User stories**: Q2, Q3, Q4, Q5
+
+### Rules for running unattended
+
+- Order: inference-only work first (minutes of compute), training runs after.
+- Every step ends with its tests passing, its results under `results/`, the README and this plan
+  updated, and a commit. Nothing is pushed or published.
+- Each step has a time box. A step that fails twice, or runs past its box, is recorded here as
+  not done, with the reason, and the day moves on.
+- `runs/poc` and `runs/poc-warm` are never overwritten. Every new run gets its own name.
+- Before each training run: check free memory, and that no other run is active. Watch the
+  per-dataset loss and stop a run that is still at chance by step 1,000 (the stall rule from
+  Phase 4b).
+- New dependencies go into `pyproject.toml` only if they install cleanly next to transformers
+  5.17. Anything that conflicts runs in a separate throwaway environment, or is dropped.
+- Findings are reported as measured, including the ones that change nothing.
+
+### Step 0: save intermediate results, and guard the machine (1.5 h)
+
+Added at the user's request before starting. The `poc-warm` run was lost once because the session
+ended during its evaluation, after training had finished: `run.py` saved the checkpoint only after
+evaluating.
+
+- Save the trained model before evaluating it.
+- Write each dataset's metrics as soon as they exist (`results/<run>/metrics.partial.json`), and
+  skip datasets already done when a run or `--eval-only` is repeated.
+- Mid-training checkpoints every 500 steps (weights, optimiser, schedule, step, random state,
+  loss history), written atomically and overwritten each time, and `run.py --resume` to continue
+  from the last one with the same data order and augmentation. Skipped batches replay their
+  augmentation so the random sequence stays identical. The file is deleted once the final model
+  is saved.
+- Safeguards for the day: an MPS memory cap (24 GB) so a runaway run fails alone instead of
+  pushing the system into swap, a watchdog that stops training if free system memory falls below
+  15%, and `caffeinate` against idle sleep.
+
+- [x] Test: a run interrupted after a checkpoint and resumed gives the same losses as an
+      uninterrupted run
+- [x] Test: evaluation skips datasets already in the partial file
+- [x] Watchdog and `caffeinate` running before the first training step of the day
+
+Done 2026-10-14. Also checked on the real model: a run killed at a checkpoint resumed and
+finished; a run killed after training, during evaluation, skipped training and the datasets
+already scored.
+
+### Step A: does the model read the instruction? (inference only, 45 min)
+
+The likeliest explanation for the unseen-task failure is that the model ignores instructions.
+Re-score `poc-warm` on every dataset three ways: the canonical instruction, no instruction, and
+a mismatched instruction (another dataset's canonical one). If accuracy barely moves, the model
+classifies from options and text alone, which explains why "Is this tweet ironic?" can't steer
+it.
+
+- [ ] Instruction variants in the evaluation path, with a test that the variant is applied
+- [ ] A table: accuracy and AUC per dataset under the three variants
+- [ ] One paragraph in the README findings
+
+### Step B: the calibration experiment (mostly inference, 1.5 h)
+
+Phase 5 as planned, on `poc-warm`: temperature scaling, global against per-dataset.
+
+- Global T: fitted by minimising log loss on fresh validation samples of the six training
+  datasets (1,000 each, disjoint from the evaluation samples), then applied unchanged to the
+  held-out datasets.
+- Per-dataset T: fitted on 200 labelled examples from each held-out dataset's train split. SMS
+  spam has a single split, so its 200 are drawn disjoint from its evaluation sample.
+- Report calibration error, Brier score and log loss raw, with global T and with per-dataset T,
+  plus a reliability diagram per dataset.
+
+- [ ] Tests: T fitting recovers a known T on synthetic logits; Brier and log loss against
+      hand-computed values
+- [ ] `results/poc-warm/calibration.json` and reliability diagrams in `results/poc-warm/plots/`
+- [ ] The finding in the README: does global T fix held-out calibration, or only per-dataset T?
+      This is the direct test of the Molas argument.
+
+### Step C: option-order averaging (inference only, 45 min)
+
+The README's next-step idea, tested. Score each evaluation example under 4 option orders and
+average the probabilities. Report accuracy, AUC and calibration error against a single order,
+and the cost (4 passes per request).
+
+- [ ] An averaging option in the evaluation path, with a test that it averages by option name
+- [ ] The comparison table, and the idea moved from "What to try next" to the findings either way
+
+### Step D: head only (one training run, 45 min)
+
+Question 5, first half. Same data and steps as `poc` (3,750 steps from plain ModernBERT), with
+the encoder and the `<opt>` vector frozen, so only `Linear(768, 1)` learns. Compared with `poc`,
+not `poc-warm`, since both start from the pretrained backbone. The prediction is near chance:
+the comparison between option and text happens inside the encoder.
+
+- [ ] `freeze_encoder` in the training config, with a test that encoder weights don't change
+- [ ] `configs/head-only.yaml`, run, results in `results/head-only/`
+
+### Step E: LoRA (one training run, 1.5 h)
+
+Question 5, the middle point: small trainable adapters on the frozen encoder, via `peft`, same
+data and steps as `poc`. Time-boxed; dropped if `peft` doesn't work with transformers 5.17 and
+ModernBERT within the box.
+
+- [ ] LoRA option in the training config (rank 16 on the attention projections, head and `<opt>`
+      vector trained), with a test that only adapter, head and `<opt>` parameters change
+- [ ] `configs/lora.yaml`, run, results in `results/lora/`, trainable parameter count recorded
+- [ ] Question 5 answered in the README: full fine-tune against LoRA against head only
+
+### Step F: baselines (inference only, 2.5 h)
+
+Phase 7, cut down. Does an existing zero-shot classifier also fail on unseen task types, and how
+much faster is one pass than one pass per option?
+
+- `MoritzLaurer/ModernBERT-base-zeroshot-v2.0`, same backbone, one NLI pass per option, with its
+  own hypothesis template, on all 12 shared evaluation sets, plus the same latency benchmark at
+  2, 10 and 50 options. MNLI is left out for it, since it was trained on NLI data.
+- GLiClass (`knowledgator/gliclass-modern-base-v2.0-init`), packed options like this project.
+  Time-boxed to 1 hour, in a separate environment if its package conflicts.
+
+- [ ] A baseline runner that writes the same `metrics.json` shape, so the results command and
+      the chart work unchanged
+- [ ] Baseline rows in the README tables and the chart; latency side by side
+
+### Step G: seed variance (one short training run, 30 min)
+
+The README warns that one seed per model can't separate small differences. Repeat the
+`poc-warm` step from `poc` with training seed 1, keeping the evaluation samples fixed (a separate
+evaluation seed), to show how much a second seed moves each number.
+
+- [ ] `eval_seed` in the config, defaulting to `seed` so earlier results reproduce
+- [ ] `configs/poc-warm-seed1.yaml`, run, and the spread reported next to the main table
+
+### Step H: write-up (1 h)
+
+- [ ] README: findings, results tables, chart and questions 3 to 5 updated; "What to try next"
+      trimmed to what is still untested
+- [ ] This plan: each step marked done or not done, with the reason; memory updated
+- [ ] Final commit and a notification
+
+Rough total: about 10.5 hours, of which about 3.5 are compute.
 
 ---
 
