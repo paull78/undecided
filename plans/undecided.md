@@ -461,8 +461,16 @@ the encoder and the `<opt>` vector frozen, so only `Linear(768, 1)` learns. Comp
 not `poc-warm`, since both start from the pretrained backbone. The prediction is near chance:
 the comparison between option and text happens inside the encoder.
 
-- [ ] `freeze_encoder` in the training config, with a test that encoder weights don't change
-- [ ] `configs/head-only.yaml`, run, results in `results/head-only/`
+- [x] `freeze_encoder` in the training config, with a test that encoder weights don't change
+- [x] `configs/head-only.yaml`, run, results in `results/head-only/`
+
+Result (2026-10-14): chance everywhere, as predicted. 769 trainable parameters, 3,750 steps in
+6.6 minutes (152 examples per second, 1.1 GB), and the per-dataset loss never left chance.
+Accuracy: AG News 0.253, banking77 0.013, TREC 0.048, SST-2 0.500 (AUC 0.50), MNLI 0.335,
+Yahoo 0.119, MASSIVE 0.011. Emotion (0.337) and SMS spam (0.745) only reflect a fixed preference
+for one label. A plausible reading: if the frozen state at each `<opt>` is roughly "label part
+plus text part", a linear head's score difference between two options depends on the labels
+alone, so it can learn a label prior and nothing that depends on the text.
 
 ### Step E: LoRA (one training run, 1.5 h)
 
