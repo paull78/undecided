@@ -1,0 +1,48 @@
+{
+  "model": "MoritzLaurer/ModernBERT-base-zeroshot-v2.0",
+  "machine": "macOS-26.5-arm64-arm-64bit",
+  "torch": "2.14.0",
+  "text_words": 20,
+  "devices": {
+    "mps": [
+      {
+        "options": 2,
+        "requests": 100,
+        "p50_ms": 15.6,
+        "p95_ms": 20.6
+      },
+      {
+        "options": 10,
+        "requests": 100,
+        "p50_ms": 26.2,
+        "p95_ms": 28.3
+      },
+      {
+        "options": 50,
+        "requests": 100,
+        "p50_ms": 110.3,
+        "p95_ms": 122.3
+      }
+    ],
+    "cpu": [
+      {
+        "options": 2,
+        "requests": 100,
+        "p50_ms": 77.6,
+        "p95_ms": 141.6
+      },
+      {
+        "options": 10,
+        "requests": 100,
+        "p50_ms": 362.0,
+        "p95_ms": 380.4
+      },
+      {
+        "options": 50,
+        "requests": 100,
+        "p50_ms": 1644.8,
+        "p95_ms": 1764.2
+      }
+    ]
+  }
+}
