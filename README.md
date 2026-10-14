@@ -135,9 +135,9 @@ never left chance, where in the working mix it is the first to learn.
 on the 6 new ones (chance 0.10). MASSIVE, with no counterpart in training, is the cleaner case.
 
 **Is the inverted subjectivity a label bug?** No: GLiClass (AUC 0.96) and the NLI baseline (0.63)
-rank the same records correctly. The README used to blame emotional plot summaries; measured with
+rank the same records correctly. An obvious suspect is emotional plot summaries, but measured with
 the model's own sentiment confidence, objective sentences are *less* intense (0.54 against 0.69),
-so that explanation is wrong and the cause is open.
+so that explanation doesn't hold and the cause is open.
 
 **How would you make the model use the instruction?** Train on examples whose options don't
 identify the task: the same text and the same yes/no options with different questions ("Is this
