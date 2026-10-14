@@ -1,0 +1,48 @@
+{
+  "model": "knowledgator/gliclass-modern-base-v2.0-init",
+  "machine": "macOS-26.5-arm64-arm-64bit",
+  "torch": "2.14.1",
+  "text_words": 20,
+  "devices": {
+    "mps": [
+      {
+        "options": 2,
+        "requests": 100,
+        "p50_ms": 18.9,
+        "p95_ms": 20.0
+      },
+      {
+        "options": 10,
+        "requests": 100,
+        "p50_ms": 28.5,
+        "p95_ms": 31.2
+      },
+      {
+        "options": 50,
+        "requests": 100,
+        "p50_ms": 48.2,
+        "p95_ms": 55.6
+      }
+    ],
+    "cpu": [
+      {
+        "options": 2,
+        "requests": 100,
+        "p50_ms": 19.6,
+        "p95_ms": 21.3
+      },
+      {
+        "options": 10,
+        "requests": 100,
+        "p50_ms": 29.4,
+        "p95_ms": 32.6
+      },
+      {
+        "options": 50,
+        "requests": 100,
+        "p50_ms": 48.6,
+        "p95_ms": 52.9
+      }
+    ]
+  }
+}
