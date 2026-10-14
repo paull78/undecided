@@ -24,6 +24,7 @@ def main() -> None:
 
     raw = yaml.safe_load(Path(args.config).read_text())
     seed, max_options = raw.get("seed", 0), raw["train"].get("max_options", 16)
+    recast_rate = raw["train"].get("recast_rate", 0.0)
     rng = random.Random(seed)
 
     for name, n in raw["data"]["train"].items():
@@ -40,7 +41,7 @@ def main() -> None:
             print(f"WARNING: paraphrases for labels that don't exist: {sorted(unknown)}")
 
         for record in rng.sample(records, args.examples):
-            out = augment(record, rng, max_options)
+            out = augment(record, rng, max_options, recast_rate)
             options = "  ".join(f"[{o}]" if i == out.answer_idx else o for i, o in enumerate(out.options))
             print(f"\n  instruction: {out.instruction or '(none)'}")
             print(f"  options:     {options}")

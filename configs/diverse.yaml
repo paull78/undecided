@@ -1,0 +1,20 @@
+# Phase 4b, step 2: ten training task types instead of six, plus yes/no recasting, on the same
+# 30k-example budget as poc. Compared with poc on every dataset.
+name: diverse
+backbone: answerdotai/ModernBERT-base
+seed: 0
+data:
+  train: {ag_news: 3000, emotion: 3000, banking77: 3000, trec: 3000, sst2: 3000, mnli: 3000,
+          qqp: 3000, qnli: 3000, cola: 3000, boolq: 3000}
+  # Same order as poc for the shared datasets, so their samples and option shuffles match exactly.
+  eval: {ag_news: 1000, emotion: 1000, banking77: 1000, trec: 500, sst2: 872, mnli: 1000,
+         yahoo_answers: 1000, massive: 1000, tweet_irony: 784,
+         sms_spam: 1000, tweet_hate: 1000, subjectivity: 1000,
+         qqp: 1000, qnli: 1000, cola: 1000, boolq: 1000}
+train:
+  epochs: 2
+  batch_size: 16
+  max_length: 512
+  max_options: 16
+  augment: true
+  recast_rate: 0.25

@@ -1,4 +1,5 @@
 import random
+import re
 
 from undecided.augment import augment
 from undecided.data import Record
@@ -106,3 +107,40 @@ def test_options_are_sometimes_paraphrased_and_the_answer_follows_its_paraphrase
 
     paraphrased = sum(a != "science and technology" for a in answers) / len(answers)
     assert 0.25 < paraphrased < 0.35
+
+
+def _asked_and_expected(out, gold):
+    """Which label a recast record asks about, and the option that should be marked correct."""
+    if set(out.options) == {"yes", "no"}:
+        asked = re.findall(r'"([^"]+)"', out.instruction)[-1]
+        return asked, "yes" if asked == gold else "no"
+    asked = next(o for o in out.options if not o.startswith("not "))
+    assert set(out.options) == {asked, f"not {asked}"}
+    return asked, asked if asked == gold else f"not {asked}"
+
+
+def test_recasting_turns_a_record_into_a_balanced_yes_no_check_on_one_label():
+    rng = random.Random(3)
+    outs = [augment(make_record(answer_idx=7), rng, max_options=16, recast_rate=1.0) for _ in range(1000)]
+
+    asked_gold = 0
+    forms = set()
+    for out in outs:
+        asked, expected = _asked_and_expected(out, gold="label 7")
+        assert out.options[out.answer_idx] == expected
+        assert asked in LABELS
+        asked_gold += asked == "label 7"
+        forms.add("yes/no" if "yes" in out.options else "label/not label")
+
+    assert forms == {"yes/no", "label/not label"}
+    assert 0.4 < asked_gold / len(outs) < 0.6
+    assert 0.4 < sum(out.answer_idx == 0 for out in outs) / len(outs) < 0.6  # no position shortcut
+
+
+def test_recasting_is_off_by_default_and_never_touches_pair_tasks():
+    rng = random.Random(4)
+    mnli = Record('Is "it rained" true?', "The street is wet.", ["true", "cannot tell", "false"], 0, "mnli", "train")
+
+    assert all(len(augment(make_record(), rng, max_options=16).options) <= 16 for _ in range(200))
+    assert not any({"yes", "no"} <= set(augment(make_record(), rng, max_options=16).options) for _ in range(200))
+    assert all(len(augment(mnli, rng, max_options=16, recast_rate=1.0).options) == 3 for _ in range(50))

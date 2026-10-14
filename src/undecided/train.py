@@ -1,6 +1,7 @@
 """Plain PyTorch training loop."""
 
 import math
+from collections import defaultdict
 import random
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -56,12 +57,27 @@ class TrainConfig:
     max_length: int = 512
     max_options: int = 16
     augment: bool = True
+    recast_rate: float = 0.0  # share of examples asked as a yes/no check on one label
     seed: int = 0
     max_steps: int | None = None  # stop early, for short checks
 
 
-def train(scorer: OptionScorer, tokenizer, records: list[Record], cfg: TrainConfig,
-          device: torch.device, on_step: Callable[[int, float], None] | None = None) -> None:
+def loss_by_source(examples: list[tuple[str, float, int]]) -> dict[str, dict]:
+    """Mean loss per source next to the loss of uniform guessing, ln(number of options).
+    examples are (source, loss, number of options), as passed to on_step."""
+    grouped = defaultdict(list)
+    for source, loss, n_options in examples:
+        grouped[source].append((loss, math.log(n_options)))
+    return {
+        source: {"n": len(pairs), "loss": sum(l for l, _ in pairs) / len(pairs),
+                 "chance": sum(c for _, c in pairs) / len(pairs)}
+        for source, pairs in grouped.items()
+    }
+
+
+def train(scorer: OptionScorer, tokenizer, records: list[Record], cfg: TrainConfig, device: torch.device,
+          on_step: Callable[[int, float, list[tuple[str, float, int]]], None] | None = None) -> None:
+    """on_step gets the step, the batch loss and (source, loss, number of options) per example."""
     rng = random.Random(cfg.seed)
     torch.manual_seed(cfg.seed)
     scorer.to(device).train()
@@ -81,10 +97,11 @@ def train(scorer: OptionScorer, tokenizer, records: list[Record], cfg: TrainConf
     for _ in range(cfg.epochs):
         for chunk in length_grouped_batches(records, cfg.batch_size, rng):
             if cfg.augment:
-                chunk = [augment(r, rng, cfg.max_options) for r in chunk]
+                chunk = [augment(r, rng, cfg.max_options, cfg.recast_rate) for r in chunk]
             batch = collate([encode(tokenizer, r, cfg.max_length) for r in chunk], tokenizer.pad_token_id)
             logits = scorer(batch["input_ids"].to(device), batch["attention_mask"].to(device))
-            loss = F.cross_entropy(logits, batch["labels"].to(device))
+            example_losses = F.cross_entropy(logits, batch["labels"].to(device), reduction="none")
+            loss = example_losses.mean()
 
             optimizer.zero_grad()
             loss.backward()
@@ -93,6 +110,7 @@ def train(scorer: OptionScorer, tokenizer, records: list[Record], cfg: TrainConf
             scheduler.step()
             step += 1
             if on_step:
-                on_step(step, loss.item())
+                examples = [(r.source, l, len(r.options)) for r, l in zip(chunk, example_losses.tolist())]
+                on_step(step, loss.item(), examples)
             if step == total_steps:
                 return

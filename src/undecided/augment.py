@@ -1,4 +1,4 @@
-"""On-the-fly training augmentation: instructions, option sampling and shuffling."""
+"""On-the-fly training augmentation: instructions, option sampling, shuffling and yes/no recasting."""
 
 import random
 from dataclasses import replace
@@ -10,10 +10,12 @@ MIN_OPTIONS = 2
 KEEP_ALL_UP_TO = 3  # sentiment and NLI: dropping a label would change the task
 NO_INSTRUCTION_RATE = 0.2
 PARAPHRASE_RATE = 0.3
-FIXED_INSTRUCTION_SOURCES = {"mnli"}  # the instruction carries the hypothesis
+FIXED_INSTRUCTION_SOURCES = {"mnli", "qqp", "qnli", "boolq"}  # the instruction carries the second text
 
 
-def augment(record: Record, rng: random.Random, max_options: int) -> Record:
+def augment(record: Record, rng: random.Random, max_options: int, recast_rate: float = 0.0) -> Record:
+    if record.source not in FIXED_INSTRUCTION_SOURCES and rng.random() < recast_rate:
+        return _recast(record, rng)
     correct = record.options[record.answer_idx]
     distractors = [o for i, o in enumerate(record.options) if i != record.answer_idx]
 
@@ -32,6 +34,24 @@ def augment(record: Record, rng: random.Random, max_options: int) -> Record:
         options=options,
         answer_idx=answer_idx,
     )
+
+
+def _recast(record: Record, rng: random.Random) -> Record:
+    """A check on one label, the shape of an unseen binary task ("ironic" or "not ironic"). The label
+    asked about is the true one half the time, so neither answer is a shortcut."""
+    correct = record.options[record.answer_idx]
+    asked = correct if rng.random() < 0.5 else rng.choice([o for o in record.options if o != correct])
+    is_correct = asked == correct
+    asked = _paraphrase([asked], PARAPHRASES.get(record.source, {}), rng)[0]
+    instruction = _instruction(record, rng)
+    if asked.startswith("not ") or rng.random() < 0.5:
+        question = f'Is the answer "{asked}"?' if instruction else f'Does "{asked}" describe this text?'
+        instruction = f"{instruction} {question}".strip()
+        options, answer = ["yes", "no"], "yes" if is_correct else "no"
+    else:
+        options, answer = [asked, f"not {asked}"], asked if is_correct else f"not {asked}"
+    rng.shuffle(options)
+    return replace(record, instruction=instruction, options=options, answer_idx=options.index(answer))
 
 
 def _paraphrase(options: list[str], paraphrases: dict[str, list[str]], rng: random.Random) -> list[str]:

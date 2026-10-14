@@ -28,6 +28,11 @@ SOURCES = {
     "trec": Source("SetFit/TREC-QC", "train", "test", data.convert_trec, label_field="label_text"),
     "sst2": Source("stanfordnlp/sst2", "train", "validation", data.convert_sst2),
     "mnli": Source("nyu-mll/multi_nli", "train", "validation_matched", data.convert_mnli, seeded=True),
+    # Added in Phase 4b for task diversity. GLUE test labels are hidden, so they evaluate on validation.
+    "qqp": Source("nyu-mll/glue", "train", "validation", data.convert_qqp, seeded=True, config="qqp"),
+    "qnli": Source("nyu-mll/glue", "train", "validation", data.convert_qnli, seeded=True, config="qnli"),
+    "cola": Source("nyu-mll/glue", "train", "validation", data.convert_cola, config="cola"),
+    "boolq": Source("google/boolq", "train", "validation", data.convert_boolq, seeded=True),
     # Held out: never trained on. Their train splits are only for fitting a per-dataset temperature.
     "yahoo_answers": Source("community-datasets/yahoo_answers_topics", "train", "test", data.convert_yahoo_answers),
     "massive": Source("SetFit/amazon_massive_intent_en-US", "train", "test", data.convert_massive,

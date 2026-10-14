@@ -63,6 +63,31 @@ INSTRUCTIONS = {
         'Can we conclude "{hypothesis}" from the text?',
         'Is "{hypothesis}" implied by the passage?',
     ],
+    # Added in Phase 4b for task diversity. Pair tasks carry the second text in the template.
+    "qqp": [
+        'Is this question a duplicate of "{question2}"?',
+        'Is this question asking the same thing as "{question2}"?',
+        'Do this question and "{question2}" mean the same?',
+        'Would "{question2}" have the same answer as this question?',
+    ],
+    "qnli": [
+        'Does this sentence answer the question "{question}"?',
+        'Is the answer to "{question}" in this text?',
+        'Can "{question}" be answered from this sentence?',
+        'Does the text contain the answer to "{question}"?',
+    ],
+    "boolq": [
+        "Based on the passage, {question}?",
+        "Answer from the text: {question}?",
+        "According to the passage, {question}?",
+        "Read the passage. Question: {question}?",
+    ],
+    "cola": [
+        "Is this sentence grammatical?",
+        "Is this sentence well-formed English?",
+        "Would a native speaker accept this sentence?",
+        "Is this sentence grammatically correct?",
+    ],
     # Held-out datasets: only the canonical instruction is ever used, since they are never trained on.
     "yahoo_answers": ["What topic is this question about?"],
     "massive": ["What does the user want the voice assistant to do?"],
@@ -162,6 +187,18 @@ PARAPHRASES = {
         "true": ["yes", "entailed"],
         "cannot tell": ["maybe", "unknown"],
         "false": ["no", "contradicted"],
+    },
+    "qqp": {
+        "duplicate": ["same question"],
+        "not duplicate": ["different question"],
+    },
+    "qnli": {
+        "answers it": ["contains the answer"],
+        "does not answer it": ["no answer here"],
+    },
+    "cola": {
+        "grammatical": ["correct", "acceptable"],
+        "ungrammatical": ["incorrect", "unacceptable"],
     },
     "banking77": {
         "card arrival": ["when will my card arrive"],

@@ -11,7 +11,7 @@
 | 2. `classify()` on any checkpoint | done 2026-09-29: save/load, `classify()`, CLI; `cuda` untested | `12815bb` |
 | 3. All training data and the first real run | done 2026-09-29: in-distribution accuracy 0.48 to 0.88, [notes](../results/poc/NOTES.md) | `9f61d0b` |
 | 4. Held-out evaluation | done 2026-09-29: Yahoo 0.469, MASSIVE 0.325 (60 options), irony 0.446, below chance; M3 exit partly met | `1a8b3bc` |
-| 4b. Unseen task types | step 1 done 2026-10-02: all four unseen task types fail (AUC 0.37 to 0.56), so step 2 runs; step 2 proposed, awaiting go-ahead | |
+| 4b. Unseen task types | step 1 done 2026-10-02 (`4d2bf01`): all four unseen task types fail (AUC 0.37 to 0.56); step 2 first attempt stuck at chance and stopped; cause found (diluted many-option tasks), fix to choose | |
 | 5. Calibration | after 4b | |
 | 6 to 11 | not started | |
 
@@ -258,6 +258,30 @@ name", so the instruction carries little weight. Keeping the total at about 30k 
 
 The new run is compared with `poc` on every in-distribution and held-out dataset, to check that
 held-out tasks improve without in-distribution scores dropping.
+
+### Step 2, first attempt (2026-10-12): stuck at chance, stopped
+
+`configs/diverse.yaml` as above trained at 29.6 examples per second, but its loss stayed near
+uniform guessing (1.003 for this mix): 0.94 averaged over steps 1,200 to 2,000, flat for the last
+800 steps while the learning rate was already decaying. It was stopped at step 2,000 of 3,750 (log
+kept as `runs/diverse-v1-stopped.log`, no checkpoint).
+
+Diagnosis, with per-dataset loss now logged every 200 steps against each dataset's own chance
+level, ln(number of options):
+
+- Diverse, steps 200 to 1,000: every dataset at chance, including AG News (0.99 against 0.98) and
+  SST-2 (0.70 against 0.69). Only CoLA, TREC and emotion dip, which label priors alone explain.
+- Control, the `poc` config on the current code: training still works, and it shows how. AG
+  News and SST-2 are *also* at chance at step 1,000. The plateau breaks on banking77 (loss 1.83,
+  1.04, 0.76 at steps 600, 800, 1,000, against 2.07 for guessing), with TREC next. These are the
+  many-option tasks where label words appear in the text ("card arrival", "my card hasn't
+  arrived"); the model learns that matching first and everything else builds on it.
+
+Cause: the diverse mix diluted the many-option examples that start learning. Multi-option
+banking77 went from 1 in 6 training examples (5,000 of 30,000) to 1 in 13 (3,000, a quarter of
+them recast to yes/no), and TREC the same. In the diverse probe banking77 never left chance (1.69
+against 1.68 at step 1,000). This also explains the "slow start" seen in the tracer and in `poc`:
+it is the time to discover word matching between options and text.
 
 ### Acceptance criteria
 

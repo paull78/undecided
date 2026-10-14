@@ -57,3 +57,42 @@ def test_batches_cover_every_record_once_and_group_similar_lengths():
     assert all(len(b) <= 16 for b in batches)
     mixed = sum(min(len(r.text) for r in b) * 10 < max(len(r.text) for r in b) for b in batches)
     assert mixed <= 2  # short and long texts rarely share a batch
+
+
+def test_training_reports_each_examples_loss_with_its_source_and_option_count(tokenizer, tiny_scorer):
+    import math
+    import random
+
+    import torch
+
+    from undecided.data import Record
+    from undecided.train import TrainConfig, train
+
+    rng = random.Random(0)
+    records = [Record("", f"text {i}", ["a", "b", "c", "d"][: 2 + i % 3], 0, ["x", "y"][i % 2], "train")
+               for i in range(24)]
+    calls = []
+
+    train(tiny_scorer, tokenizer, records, TrainConfig(epochs=1, batch_size=8, augment=False, max_length=64),
+          torch.device("cpu"), on_step=lambda step, loss, examples: calls.append((loss, examples)))
+
+    assert len(calls) == 3
+    for loss, examples in calls:
+        assert len(examples) == 8
+        assert {source for source, _, _ in examples} <= {"x", "y"}
+        assert all(n in (2, 3, 4) for _, _, n in examples)
+        assert math.isclose(loss, sum(l for _, l, _ in examples) / 8, rel_tol=1e-4)
+
+
+def test_losses_are_summarised_per_source_against_uniform_guessing():
+    import math
+
+    from undecided.train import loss_by_source
+
+    examples = [("x", 0.2, 2), ("x", 0.4, 4), ("y", 1.0, 3)]
+
+    summary = loss_by_source(examples)
+
+    assert summary["x"]["n"] == 2 and math.isclose(summary["x"]["loss"], 0.3)
+    assert math.isclose(summary["x"]["chance"], (math.log(2) + math.log(4)) / 2)
+    assert math.isclose(summary["y"]["chance"], math.log(3))

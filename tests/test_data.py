@@ -141,3 +141,38 @@ def test_extra_held_out_tasks_are_binary_with_readable_options(convert, rows, op
     assert [r.options[r.answer_idx] for r in records] == answers
     assert {r.group for r in records} == {"heldout_task"}
     assert all(r.instruction and r.text == r.text.strip() for r in records)
+
+
+@pytest.mark.parametrize(
+    ("convert", "row", "text", "inside", "options", "answer"),
+    [
+        ("convert_qqp", {"question1": "How do I learn Python?", "question2": "Best way to learn Python?", "label": 1},
+         "How do I learn Python?", "Best way to learn Python?", ["not duplicate", "duplicate"], "duplicate"),
+        ("convert_qnli", {"question": "Who wrote Hamlet?", "sentence": "Hamlet is a play by Shakespeare.", "label": 0},
+         "Hamlet is a play by Shakespeare.", "Who wrote Hamlet?", ["answers it", "does not answer it"], "answers it"),
+        ("convert_boolq", {"question": "is the sun a star", "passage": "The Sun is the star at the centre.", "answer": True},
+         "The Sun is the star at the centre.", "is the sun a star", ["no", "yes"], "yes"),
+    ],
+)
+def test_pair_tasks_put_the_second_text_inside_a_seeded_instruction(convert, row, text, inside, options, answer):
+    import undecided.data as data
+
+    records = getattr(data, convert)([row] * 40, seed=0)
+
+    assert records[0].text == text
+    assert all(inside in r.instruction for r in records)
+    assert records[0].options == options
+    assert records[0].options[records[0].answer_idx] == answer
+    assert {r.group for r in records} == {"train"}
+    assert len({r.instruction for r in records}) > 1  # templates vary
+    assert records == getattr(data, convert)([row] * 40, seed=0)
+
+
+def test_cola_sentences_are_judged_grammatical_or_not():
+    from undecided.data import convert_cola
+
+    bad, good = convert_cola([{"sentence": "Him went home.", "label": 0}, {"sentence": "She went home.", "label": 1}])
+
+    assert bad.options == ["ungrammatical", "grammatical"]
+    assert (bad.options[bad.answer_idx], good.options[good.answer_idx]) == ("ungrammatical", "grammatical")
+    assert bad.source == "cola" and bad.group == "train"

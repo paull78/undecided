@@ -28,6 +28,10 @@ IRONY_LABELS = ["not ironic", "ironic"]
 SPAM_LABELS = ["not spam", "spam"]
 HATE_LABELS = ["not hate speech", "hate speech"]
 SUBJECTIVITY_LABELS = ["objective", "subjective"]
+QQP_OPTIONS = ["not duplicate", "duplicate"]
+QNLI_OPTIONS = ["answers it", "does not answer it"]  # entailment, not_entailment
+BOOLQ_OPTIONS = ["no", "yes"]
+COLA_LABELS = ["ungrammatical", "grammatical"]
 
 
 def verbalise(label: str) -> str:
@@ -75,22 +79,44 @@ def convert_trec(rows: Iterable[dict], labels: list[str]) -> list[Record]:
     return _records(rows, "trec", labels, by_name=True)
 
 
-def convert_mnli(rows: Iterable[dict], seed: int) -> list[Record]:
-    """Premise as text, hypothesis inside the instruction. The instruction must carry the
-    hypothesis, so the template is picked here (seeded) instead of during augmentation."""
+def _pair_records(rows: Iterable[dict], source: str, seed: int, text: str, slot: str,
+                  options: list[str], answer) -> list[Record]:
+    """Tasks over two texts: one is the text, the other goes inside the instruction. The instruction
+    must carry it, so the template is picked here (seeded) instead of during augmentation."""
     rng = random.Random(seed)
     return [
         Record(
-            instruction=rng.choice(INSTRUCTIONS["mnli"]).format(hypothesis=row["hypothesis"].strip()),
-            text=row["premise"],
-            options=list(MNLI_OPTIONS),
-            answer_idx=row["label"],
-            source="mnli",
+            instruction=rng.choice(INSTRUCTIONS[source]).format(**{slot: row[slot].strip()}),
+            text=row[text],
+            options=list(options),
+            answer_idx=answer(row),
+            source=source,
             group="train",
         )
         for row in rows
-        if row["label"] >= 0
+        if answer(row) >= 0
     ]
+
+
+def convert_mnli(rows: Iterable[dict], seed: int) -> list[Record]:
+    """Premise as text, hypothesis inside the instruction. Rows without a gold label (-1) are dropped."""
+    return _pair_records(rows, "mnli", seed, "premise", "hypothesis", MNLI_OPTIONS, lambda r: r["label"])
+
+
+def convert_qqp(rows: Iterable[dict], seed: int) -> list[Record]:
+    return _pair_records(rows, "qqp", seed, "question1", "question2", QQP_OPTIONS, lambda r: r["label"])
+
+
+def convert_qnli(rows: Iterable[dict], seed: int) -> list[Record]:
+    return _pair_records(rows, "qnli", seed, "sentence", "question", QNLI_OPTIONS, lambda r: r["label"])
+
+
+def convert_boolq(rows: Iterable[dict], seed: int) -> list[Record]:
+    return _pair_records(rows, "boolq", seed, "passage", "question", BOOLQ_OPTIONS, lambda r: int(r["answer"]))
+
+
+def convert_cola(rows: Iterable[dict]) -> list[Record]:
+    return _records(rows, "cola", COLA_LABELS, text_field="sentence")
 
 
 def convert_yahoo_answers(rows: Iterable[dict]) -> list[Record]:

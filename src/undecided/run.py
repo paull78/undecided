@@ -31,7 +31,7 @@ from undecided.evaluate import evaluate
 from undecided.model import OptionScorer, Undecided
 from undecided.results import group_summary
 from undecided.sources import load_records
-from undecided.train import TrainConfig, train
+from undecided.train import TrainConfig, loss_by_source, train
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
@@ -111,18 +111,25 @@ def main(config_path: str, only_eval: bool = False) -> None:
     else:
         eval_sets = load_eval_sets(raw, seed)
 
-    losses, start, peak_gb = [], time.time(), 0.0
+    losses, window, start, peak_gb = [], [], time.time(), 0.0
 
-    def on_step(step: int, loss: float) -> None:
-        nonlocal peak_gb
+    def on_step(step: int, loss: float, examples: list) -> None:
+        nonlocal peak_gb, window
         losses.append(loss)
+        window += examples
         if step % 20 == 0:
             peak_gb = max(peak_gb, device_memory_gb(device))
             recent = sum(losses[-20:]) / len(losses[-20:])
             rate = step * train_cfg.batch_size / (time.time() - start)
             print(f"step {step:5d}  loss {recent:.4f}  {rate:.1f} examples/s  {memory_report(device)}", flush=True)
-        if step % 200 == 0 and device.type == "mps":
-            torch.mps.empty_cache()  # batch shapes vary, so the allocator cache would keep growing
+        if step % 200 == 0:
+            # Per-dataset loss against uniform guessing: the average can hide which tasks learn.
+            per_source = loss_by_source(window)
+            print("  by source (loss / chance): " + "  ".join(
+                f"{s} {v['loss']:.2f}/{v['chance']:.2f}" for s, v in sorted(per_source.items())), flush=True)
+            window = []
+            if device.type == "mps":
+                torch.mps.empty_cache()  # batch shapes vary, so the allocator cache would keep growing
 
     train(scorer, tokenizer, train_records, train_cfg, device, on_step=on_step)
     seconds = time.time() - start
