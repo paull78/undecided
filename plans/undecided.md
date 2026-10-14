@@ -24,7 +24,7 @@
 | 9. Design ablations | not done, project closed | |
 | 10. Optional full run in the cloud | not done, project closed | |
 | 11. Write-up | done 2026-10-14: README rewritten as the write-up | closing commit |
-| Closing day | started 2026-10-14: step 0 done, step A next | |
+| Closing day | started 2026-10-14: steps 0 and A done; B and C running | |
 
 ## Architectural decisions
 
@@ -393,9 +393,19 @@ a mismatched instruction (another dataset's canonical one). If accuracy barely m
 classifies from options and text alone, which explains why "Is this tweet ironic?" can't steer
 it.
 
-- [ ] Instruction variants in the evaluation path, with a test that the variant is applied
-- [ ] A table: accuracy and AUC per dataset under the three variants
-- [ ] One paragraph in the README findings
+- [x] Instruction variants in the evaluation path, with a test that the variant is applied
+- [x] A table: accuracy and AUC per dataset under the three variants
+- [ ] One paragraph in the README findings (step H)
+
+Result (2026-10-14, `results/poc-warm/probe-instructions.json`): the model ignores the
+instruction. On the five single-text training datasets and the two new-label sets, removing it
+or swapping in another dataset's moves accuracy by at most 0.012 (TREC 0.772, 0.762, 0.760). On
+the unseen tasks, irony accuracy rises without its instruction (0.478 to 0.597, AUC 0.53 to
+0.55); SMS spam is the only dataset where the instruction carries signal (AUC 0.68 with it,
+0.58 without, 0.59 with the hate-speech instruction). A likely reason, not tested: in training
+each task's instruction always arrives with that task's label set, so the options already
+identify the task and the instruction adds nothing the model needs. That suggests training data
+where the same text and options get different answers under different instructions.
 
 ### Step B: the calibration experiment (mostly inference, 1.5 h)
 

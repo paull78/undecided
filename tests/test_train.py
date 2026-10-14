@@ -137,3 +137,47 @@ def test_a_resumed_run_continues_exactly_where_an_interrupted_one_stopped(tokeni
 
     assert len(uninterrupted) == 12
     assert resumed == pytest.approx(uninterrupted, rel=1e-5)
+
+
+def test_a_frozen_encoder_stays_untouched_and_only_the_head_learns(tokenizer, tiny_scorer):
+    import copy
+
+    import torch
+
+    from undecided.data import Record
+    from undecided.train import TrainConfig, train
+
+    records = [Record("", f"text {i}", ["a", "b", "c"], i % 3, "test", "train") for i in range(32)]
+    before = copy.deepcopy(tiny_scorer.state_dict())
+
+    train(tiny_scorer, tokenizer, records, TrainConfig(epochs=1, batch_size=8, max_length=64, freeze_encoder=True),
+          torch.device("cpu"))
+
+    after = tiny_scorer.state_dict()
+    changed = {name for name in before if not torch.equal(before[name], after[name])}
+    assert changed == {"head.weight", "head.bias"}
+
+
+def test_lora_trains_adapters_head_and_opt_vector_then_merges_back_into_a_plain_encoder(tokenizer, tiny_scorer):
+    import copy
+
+    import torch
+
+    from undecided.data import Record
+    from undecided.train import TrainConfig, train
+
+    records = [Record("", f"text {i}", ["a", "b", "c"], i % 3, "test", "train") for i in range(32)]
+    before = copy.deepcopy(tiny_scorer.state_dict())
+    encoder_type = type(tiny_scorer.encoder)
+
+    train(tiny_scorer, tokenizer, records,
+          TrainConfig(epochs=1, batch_size=8, max_length=64, lora_rank=4, lora_lr=1e-2), torch.device("cpu"))
+
+    after = tiny_scorer.state_dict()
+    assert type(tiny_scorer.encoder) is encoder_type  # adapters merged away, same keys as before
+    assert set(after) == set(before)
+    changed = {name for name in before if not torch.equal(before[name], after[name])}
+    assert {"head.weight", "opt_embedding"} <= changed
+    attention = {n for n in changed if ".attn." in n}
+    assert attention and all(n.endswith(("Wqkv.weight", "Wo.weight")) for n in attention)  # merged adapters
+    assert not any(".mlp." in n or "embeddings" in n or "norm" in n for n in changed)

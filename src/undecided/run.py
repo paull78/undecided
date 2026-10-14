@@ -181,8 +181,10 @@ def main(config_path: str, only_eval: bool = False, resume: bool = False) -> Non
         run_dir.mkdir(parents=True, exist_ok=True)
         if resume and state.exists():
             print(f"resuming from {state}")
+        info = {}
         losses = train(scorer, tokenizer, train_records, train_cfg, device, on_step=on_step,
-                       checkpoint=state, checkpoint_every=raw.get("checkpoint_every", 500), resume=resume)
+                       checkpoint=state, checkpoint_every=raw.get("checkpoint_every", 500), resume=resume,
+                       info=info)
         seconds = time.time() - start
         train_stats = {
             "examples": len(train_records),
@@ -191,6 +193,7 @@ def main(config_path: str, only_eval: bool = False, resume: bool = False) -> Non
             "examples_per_second": round(steps_this_session * train_cfg.batch_size / seconds, 2),
             "final_loss": round(sum(losses[-20:]) / len(losses[-20:]), 4),
             "peak_memory_gb": round(peak_gb, 2),
+            "trainable_parameters": info.get("trainable_parameters"),
             "resumed": resume and steps_this_session < len(losses),
         }
         # Save the model before evaluating, so an interruption during evaluation loses nothing.

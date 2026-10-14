@@ -176,3 +176,19 @@ def test_cola_sentences_are_judged_grammatical_or_not():
     assert bad.options == ["ungrammatical", "grammatical"]
     assert (bad.options[bad.answer_idx], good.options[good.answer_idx]) == ("ungrammatical", "grammatical")
     assert bad.source == "cola" and bad.group == "train"
+
+
+def test_index_picking_reproduces_earlier_samples_and_can_avoid_rows_already_used():
+    import random
+
+    from undecided.sources import pick_indices
+
+    # Without exclusions: exactly what load_records has always sampled.
+    assert pick_indices(100, 10, seed=0) == sorted(random.Random(0).sample(range(100), 10))
+    assert pick_indices(100, 200, seed=0) is None  # n covers everything: no sampling
+
+    used = set(pick_indices(100, 60, seed=0))
+    fresh = pick_indices(100, 30, seed=5, exclude=used)
+    assert len(fresh) == 30 and not used & set(fresh)
+    assert pick_indices(100, 30, seed=5, exclude=used) == fresh
+    assert len(pick_indices(100, 70, seed=5, exclude=used)) == 40  # only 40 rows are left

@@ -45,8 +45,18 @@ SOURCES = {
 }
 
 
-def load_records(name: str, split: str, n: int, seed: int) -> list[Record]:
-    """A fixed-seed sample of n examples from the "train" or "eval" split, the same on every call."""
+def pick_indices(total: int, n: int, seed: int, exclude: set[int] | None = None) -> list[int] | None:
+    """Row indices for a fixed-seed sample of n rows, avoiding exclude. None means every row.
+    Without exclude this is the sample load_records has always drawn, so earlier runs reproduce."""
+    if not exclude:
+        return None if n >= total else sorted(random.Random(seed).sample(range(total), n))
+    pool = [i for i in range(total) if i not in exclude]
+    return sorted(random.Random(seed).sample(pool, min(n, len(pool))))
+
+
+def load_records(name: str, split: str, n: int, seed: int, exclude: set[int] | None = None) -> list[Record]:
+    """A fixed-seed sample of n examples from the "train" or "eval" split, the same on every call.
+    exclude lists row indices of that split to leave out, such as rows used for training."""
     source = SOURCES[name]
     rows = load_dataset(source.path, source.config, split=source.train_split if split == "train" else source.eval_split)
     kwargs = {}
@@ -56,6 +66,16 @@ def load_records(name: str, split: str, n: int, seed: int) -> list[Record]:
         kwargs["labels"] = sorted(set(train_rows[source.label_field]))
     if source.seeded:
         kwargs["seed"] = seed
-    if n < len(rows):
-        rows = rows.select(sorted(random.Random(seed).sample(range(len(rows)), n)))
+    indices = pick_indices(len(rows), n, seed, exclude)
+    if indices is not None:
+        rows = rows.select(indices)
     return source.convert(rows, **kwargs)
+
+
+def sampled_indices(name: str, split: str, n: int, seed: int) -> set[int]:
+    """The row indices a load_records call with these arguments uses."""
+    source = SOURCES[name]
+    total = load_dataset(source.path, source.config,
+                         split=source.train_split if split == "train" else source.eval_split).num_rows
+    indices = pick_indices(total, n, seed)
+    return set(range(total)) if indices is None else set(indices)

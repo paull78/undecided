@@ -17,18 +17,22 @@ from undecided.encoding import collate, encode
 from undecided.model import OptionScorer
 
 
-def build_optimizer(scorer: OptionScorer, head_lr: float, encoder_lr: float, weight_decay: float):
+def build_optimizer(scorer: OptionScorer, head_lr: float, encoder_lr: float, weight_decay: float,
+                    lora_lr: float | None = None):
     """Two AdamW groups: the new head learns fast; the encoder and the <opt> vector learn slowly.
 
     <opt> feeds every attention layer, so moving it at the head's rate collapsed the encoder.
+    Frozen parameters (requires_grad False) are left out. LoRA adapters, when present, get lora_lr.
     """
-    return torch.optim.AdamW(
-        [
-            {"params": list(scorer.head.parameters()), "lr": head_lr},
-            {"params": [scorer.opt_embedding, *scorer.encoder.parameters()], "lr": encoder_lr},
-        ],
-        weight_decay=weight_decay,
-    )
+    lora = [p for n, p in scorer.encoder.named_parameters() if "lora_" in n and p.requires_grad]
+    lora_ids = {id(p) for p in lora}
+    groups = [
+        {"params": [p for p in scorer.head.parameters() if p.requires_grad], "lr": head_lr},
+        {"params": [p for p in [scorer.opt_embedding, *scorer.encoder.parameters()]
+                    if p.requires_grad and id(p) not in lora_ids], "lr": encoder_lr},
+        {"params": lora, "lr": lora_lr or encoder_lr},
+    ]
+    return torch.optim.AdamW([g for g in groups if g["params"]], weight_decay=weight_decay)
 
 
 POOL_BATCHES = 50  # sort by length within pools of this many batches, so order stays random
@@ -60,6 +64,9 @@ class TrainConfig:
     max_options: int = 16
     augment: bool = True
     recast_rate: float = 0.0  # share of examples asked as a yes/no check on one label
+    freeze_encoder: bool = False  # train the head only; the encoder and the <opt> vector stay fixed
+    lora_rank: int = 0  # > 0: freeze the encoder and train LoRA adapters on its attention projections
+    lora_lr: float = 2e-4
     seed: int = 0
     max_steps: int | None = None  # stop early, for short checks
 
@@ -86,23 +93,38 @@ def _save_state(path: Path, state: dict) -> None:
 
 def train(scorer: OptionScorer, tokenizer, records: list[Record], cfg: TrainConfig, device: torch.device,
           on_step: Callable[[int, float, list[tuple[str, float, int]]], None] | None = None,
-          checkpoint: Path | None = None, checkpoint_every: int = 500, resume: bool = False) -> list[float]:
+          checkpoint: Path | None = None, checkpoint_every: int = 500, resume: bool = False,
+          info: dict | None = None) -> list[float]:
     """Train and return the loss of every step.
 
     on_step gets the step, the batch loss and (source, loss, number of options) per example. With a
     checkpoint path, the full training state is saved there every checkpoint_every steps; resume=True
-    continues from it with the same batches and augmentation as an uninterrupted run.
+    continues from it with the same batches and augmentation as an uninterrupted run. info, if given,
+    receives facts about the run (the number of trainable parameters).
     """
     rng = random.Random(cfg.seed)
     torch.manual_seed(cfg.seed)
     scorer.to(device).train()
+    if cfg.freeze_encoder:
+        for param in [scorer.opt_embedding, *scorer.encoder.parameters()]:
+            param.requires_grad_(False)
+    if cfg.lora_rank:
+        from peft import LoraConfig, get_peft_model  # only needed for this ablation
+
+        scorer.encoder = get_peft_model(scorer.encoder, LoraConfig(
+            r=cfg.lora_rank, lora_alpha=2 * cfg.lora_rank, lora_dropout=0.0,
+            target_modules=r".*\.attn\.(Wqkv|Wo)"))  # attention only; the MLP's output is also called Wo
+        scorer.to(device)
 
     steps_per_epoch = math.ceil(len(records) / cfg.batch_size)
     total_steps = steps_per_epoch * cfg.epochs
     if cfg.max_steps:
         total_steps = min(total_steps, cfg.max_steps)
     warmup_steps = max(1, int(total_steps * cfg.warmup_ratio))
-    optimizer = build_optimizer(scorer, cfg.head_lr, cfg.encoder_lr, cfg.weight_decay)
+    optimizer = build_optimizer(scorer, cfg.head_lr, cfg.encoder_lr, cfg.weight_decay,
+                                lora_lr=cfg.lora_lr if cfg.lora_rank else None)
+    if info is not None:
+        info["trainable_parameters"] = sum(p.numel() for g in optimizer.param_groups for p in g["params"])
     scheduler = torch.optim.lr_scheduler.LambdaLR(
         optimizer,
         lambda step: min((step + 1) / warmup_steps, max(0.0, (total_steps - step) / (total_steps - warmup_steps))),
@@ -150,5 +172,12 @@ def train(scorer: OptionScorer, tokenizer, records: list[Record], cfg: TrainConf
                 examples = [(r.source, l, len(r.options)) for r, l in zip(chunk, example_losses.tolist())]
                 on_step(step, losses[-1], examples)
             if step == total_steps:
-                return losses
+                return _finish(scorer, losses)
+    return _finish(scorer, losses)
+
+
+def _finish(scorer: OptionScorer, losses: list[float]) -> list[float]:
+    """Merge LoRA adapters into the encoder weights, so the result saves and loads like any model."""
+    if hasattr(scorer.encoder, "merge_and_unload"):
+        scorer.encoder = scorer.encoder.merge_and_unload()
     return losses
