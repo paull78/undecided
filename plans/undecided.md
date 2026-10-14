@@ -24,7 +24,7 @@
 | 9. Design ablations | not done, project closed | |
 | 10. Optional full run in the cloud | not done, project closed | |
 | 11. Write-up | done 2026-10-14: README rewritten as the write-up | closing commit |
-| Closing day | started 2026-10-14: steps 0 to E done; F and G running | |
+| Closing day | started 2026-10-14: steps 0 to F done; G running | |
 
 ## Architectural decisions
 
@@ -505,9 +505,27 @@ much faster is one pass than one pass per option?
 - GLiClass (`knowledgator/gliclass-modern-base-v2.0-init`), packed options like this project.
   Time-boxed to 1 hour, in a separate environment if its package conflicts.
 
-- [ ] A baseline runner that writes the same `metrics.json` shape, so the results command and
+- [x] A baseline runner that writes the same `metrics.json` shape, so the results command and
       the chart work unchanged
-- [ ] Baseline rows in the README tables and the chart; latency side by side
+- [ ] Baseline rows in the README tables and the chart; latency side by side (step H)
+
+Result (2026-10-14): the NLI baseline is far stronger on everything `undecided` didn't train on,
+and much slower. `ModernBERT-base-zeroshot-v2.0` (template "This example is {}.", no instruction):
+Yahoo 0.645 and MASSIVE 0.701 against `poc-warm`'s 0.478 and 0.422; unseen task AUC irony 0.78,
+SMS spam 0.99, subjectivity 0.63, hate speech 0.59 (against 0.53, 0.68, 0.34, 0.54). `undecided`
+wins only on two of its own training datasets, emotion (0.901 against 0.763) and TREC (0.772
+against 0.330, where question-type labels fit the template badly). Latency p50 on MPS at 2, 10
+and 50 options: 15.6, 26.2 and 110.3 ms, against `undecided`'s 9.2, 11.6 and 23.2; on CPU 77.6,
+362 and 1,645 ms against 18.7, 28.7 and 49.5. The CPU gap at 2 options (4 times, where two passes
+predict about 2) suggests overhead in the baseline runner, not profiled.
+
+GLiClass (`gliclass-modern-base-v2.0-init`, instruction passed as its prompt, scores normalised
+per record) is uneven: near chance on the many-option datasets (banking77 0.091, TREC 0.094,
+MASSIVE 0.050), weak on AG News (0.643) and emotion (0.271), the best of all models on
+subjectivity (0.819, AUC 0.96), good on SST-2 (0.866). Not investigated within the time box:
+whether the "-init" checkpoint is meant to be fine-tuned further, and how it handles more than
+the 25 classes it defaults to. Its MPS and CPU timings match (18.9 and 19.6 ms at 2 options,
+48.2 and 48.6 at 50), so the device setting may not have taken effect.
 
 ### Step G: seed variance (one short training run, 30 min)
 
