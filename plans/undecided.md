@@ -24,7 +24,7 @@
 | 9. Design ablations | not done, project closed | |
 | 10. Optional full run in the cloud | not done, project closed | |
 | 11. Write-up | done 2026-10-14: README rewritten as the write-up | closing commit |
-| Closing day | started 2026-10-14: steps 0 and A done; B and C running | |
+| Closing day | started 2026-10-14: steps 0, A, B, C done; D to G running | |
 
 ## Architectural decisions
 
@@ -419,11 +419,22 @@ Phase 5 as planned, on `poc-warm`: temperature scaling, global against per-datas
 - Report calibration error, Brier score and log loss raw, with global T and with per-dataset T,
   plus a reliability diagram per dataset.
 
-- [ ] Tests: T fitting recovers a known T on synthetic logits; Brier and log loss against
+- [x] Tests: T fitting recovers a known T on synthetic logits; Brier and log loss against
       hand-computed values
-- [ ] `results/poc-warm/calibration.json` and reliability diagrams in `results/poc-warm/plots/`
+- [x] `results/poc-warm/probe-calibration.json` and reliability diagrams in
+      `results/poc-warm/plots/reliability.png`
 - [ ] The finding in the README: does global T fix held-out calibration, or only per-dataset T?
-      This is the direct test of the Molas argument.
+      This is the direct test of the Molas argument. (step H)
+
+Result (2026-10-14): only per-dataset T. Global T = 1.18, fitted on 5,452 examples (1,000 per
+training dataset; TREC had only 452 rows left unused by training). On the training datasets it
+helps where they were off (TREC 0.081 to 0.044). On the six held-out datasets, mean calibration
+error goes from 0.161 raw to 0.140 with global T and 0.058 with per-dataset T. The fitted
+per-dataset temperatures disagree in direction, which is why no single T can work: SMS spam needs
+0.55 (the model is underconfident there) while Yahoo needs 2.31 and hate speech 3.87.
+Subjectivity's T runs into the search bound of 20, flattening its probabilities to near uniform,
+and its error stays at 0.106: with an inverted ranking (accuracy falls as confidence rises), no
+temperature fixes it. This is what the Molas argument predicts for a zero-shot model.
 
 ### Step C: option-order averaging (inference only, 45 min)
 
@@ -431,8 +442,17 @@ The README's next-step idea, tested. Score each evaluation example under 4 optio
 average the probabilities. Report accuracy, AUC and calibration error against a single order,
 and the cost (4 passes per request).
 
-- [ ] An averaging option in the evaluation path, with a test that it averages by option name
-- [ ] The comparison table, and the idea moved from "What to try next" to the findings either way
+- [x] An averaging option in the evaluation path, with a test that it averages by option name
+- [x] The comparison table (`results/poc-warm/probe-orders.json`)
+- [ ] The idea moved from "What to try next" to the findings (step H)
+
+Result (2026-10-14): averaging 4 orders helps where there are many options and nowhere else.
+Against the mean of the 4 single orders: banking77 0.642 to 0.669 accuracy (calibration error
+0.060 to 0.031), TREC 0.774 to 0.792 (0.074 to 0.051), MASSIVE 0.419 to 0.440 (0.125 to 0.084).
+Datasets with 2 to 6 options move by less than 0.01, and the unseen task types don't improve
+(AUC unchanged within 0.01). Single orders differ by up to 0.018 accuracy on TREC. Cost: 4
+forward passes per request. The earlier spam AUC of 0.56 came from one fixed order ("not spam,
+spam"); random orders give 0.66 to 0.68.
 
 ### Step D: head only (one training run, 45 min)
 

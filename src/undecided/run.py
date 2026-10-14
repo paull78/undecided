@@ -113,7 +113,8 @@ def eval_only(raw: dict, seed: int) -> None:
     results = Path("results") / name
     metrics = json.loads((results / "metrics.json").read_text())
     partial = results / "metrics.eval-only.partial.json"
-    metrics.update(evaluate_all(model.scorer, model.tokenizer, load_eval_sets(raw, seed), model.max_length,
+    metrics.update(evaluate_all(model.scorer, model.tokenizer, load_eval_sets(raw, raw.get("eval_seed", seed)),
+                                model.max_length,
                                 model.device, partial=partial))
     (results / "metrics.json").write_text(json.dumps(metrics, indent=2) + "\n")
     partial.unlink(missing_ok=True)
@@ -146,11 +147,14 @@ def main(config_path: str, only_eval: bool = False, resume: bool = False) -> Non
         tokenizer = build_tokenizer(raw["backbone"])
         scorer = build_scorer(raw["backbone"], tokenizer)
 
-    train_records = [r for ds, n in raw["data"]["train"].items() for r in load_records(ds, "train", n, seed)]
+    # seed drives training randomness; data_seed and eval_seed (both default seed) pick the samples, so a
+    # second training seed can keep the same training and evaluation examples.
+    data_seed, eval_seed = raw.get("data_seed", seed), raw.get("eval_seed", seed)
+    train_records = [r for ds, n in raw["data"]["train"].items() for r in load_records(ds, "train", n, data_seed)]
     if raw["data"].get("eval_on_train"):
         eval_sets = {"train_set": train_records}
     else:
-        eval_sets = load_eval_sets(raw, seed)
+        eval_sets = load_eval_sets(raw, eval_seed)
 
     window, start, peak_gb, steps_this_session = [], time.time(), 0.0, 0
 
