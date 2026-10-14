@@ -1,0 +1,21 @@
+# Phase 4b, step 2, second attempt: start from the trained poc checkpoint, which has already learned
+# to match options to text, then train one epoch on the ten-task mix with yes/no recasting.
+# From scratch this mix stalled at chance (see the plan). Compared with poc-warm, the control.
+name: diverse-warm
+backbone: answerdotai/ModernBERT-base
+init_from: runs/poc
+seed: 0  # also fixes the evaluation samples, so they match poc exactly
+data:
+  train: {ag_news: 3000, emotion: 3000, banking77: 3000, trec: 3000, sst2: 3000, mnli: 3000,
+          qqp: 3000, qnli: 3000, cola: 3000, boolq: 3000}
+  eval: {ag_news: 1000, emotion: 1000, banking77: 1000, trec: 500, sst2: 872, mnli: 1000,
+         yahoo_answers: 1000, massive: 1000, tweet_irony: 784,
+         sms_spam: 1000, tweet_hate: 1000, subjectivity: 1000,
+         qqp: 1000, qnli: 1000, cola: 1000, boolq: 1000}
+train:
+  epochs: 1
+  batch_size: 16
+  max_length: 512
+  max_options: 16
+  augment: true
+  recast_rate: 0.25

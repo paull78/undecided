@@ -102,8 +102,13 @@ def main(config_path: str, only_eval: bool = False) -> None:
     device = pick_device()
     print(f"run {name} on {device}")
 
-    tokenizer = build_tokenizer(raw["backbone"])
-    scorer = build_scorer(raw["backbone"], tokenizer)
+    if raw.get("init_from"):  # continue training a saved checkpoint instead of the pretrained backbone
+        start_from = Undecided.from_pretrained(raw["init_from"], device)
+        tokenizer, scorer = start_from.tokenizer, start_from.scorer
+        print(f"starting from {raw['init_from']}")
+    else:
+        tokenizer = build_tokenizer(raw["backbone"])
+        scorer = build_scorer(raw["backbone"], tokenizer)
 
     train_records = [r for ds, n in raw["data"]["train"].items() for r in load_records(ds, "train", n, seed)]
     if raw["data"].get("eval_on_train"):

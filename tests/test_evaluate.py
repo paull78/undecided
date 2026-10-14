@@ -45,3 +45,40 @@ def test_accuracy_is_broken_down_by_the_position_of_the_correct_option():
         "2": {"n": 2, "accuracy": 0.5},
         "3": {"n": 1, "accuracy": 0.0},
     }
+
+
+def test_calibration_error_compares_confidence_with_accuracy_bin_by_bin():
+    # Four predictions at 0.9 confidence, three right: that bin is off by |0.75 - 0.9| = 0.15.
+    # Two predictions at 0.6 confidence, both right: off by |1.0 - 0.6| = 0.4.
+    # ECE weighs bins by size: (4 * 0.15 + 2 * 0.4) / 6.
+    records = [rec(["a", "b"], 0)] * 3 + [rec(["a", "b"], 1)] + [rec(["a", "b"], 0)] * 2
+    probs = [[0.9, 0.1]] * 4 + [[0.6, 0.4]] * 2
+
+    metrics = score(records, probs)
+
+    assert math.isclose(metrics["ece"], (4 * 0.15 + 2 * 0.4) / 6)
+    assert math.isclose(metrics["confidence"], (4 * 0.9 + 2 * 0.6) / 6)
+
+
+def test_a_perfectly_calibrated_model_has_zero_calibration_error():
+    records = [rec(["a", "b"], 0)] * 7 + [rec(["a", "b"], 1)] * 3
+    probs = [[0.7, 0.3]] * 10  # always 70% sure of "a", right 70% of the time
+
+    assert math.isclose(score(records, probs)["ece"], 0.0, abs_tol=1e-9)
+
+
+def test_binary_datasets_report_ranking_auc_whatever_the_option_order():
+    # P("spam") ranks all spam above all ham, though the model never crosses 0.5 for spam.
+    records = [rec(["spam", "ham"], 0), rec(["ham", "spam"], 1), rec(["ham", "spam"], 0), rec(["spam", "ham"], 1)]
+    probs = [[0.45, 0.55], [0.6, 0.4], [0.9, 0.1], [0.2, 0.8]]
+
+    metrics = score(records, probs)
+
+    assert metrics["accuracy"] == 0.5
+    assert metrics["auc"] == 1.0
+
+
+def test_auc_is_left_out_when_records_have_more_than_two_options():
+    records = [rec(["a", "b", "c"], 0), rec(["a", "b", "c"], 1)]
+
+    assert "auc" not in score(records, [[0.5, 0.3, 0.2], [0.2, 0.5, 0.3]])
