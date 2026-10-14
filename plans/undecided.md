@@ -24,7 +24,7 @@
 | 9. Design ablations | not done, project closed | |
 | 10. Optional full run in the cloud | not done, project closed | |
 | 11. Write-up | done 2026-10-14: README rewritten as the write-up | closing commit |
-| Closing day | started 2026-10-14: steps 0, A, B, C done; D to G running | |
+| Closing day | started 2026-10-14: steps 0 to E done; F and G running | |
 
 ## Architectural decisions
 
@@ -478,10 +478,21 @@ Question 5, the middle point: small trainable adapters on the frozen encoder, vi
 data and steps as `poc`. Time-boxed; dropped if `peft` doesn't work with transformers 5.17 and
 ModernBERT within the box.
 
-- [ ] LoRA option in the training config (rank 16 on the attention projections, head and `<opt>`
+- [x] LoRA option in the training config (rank 16 on the attention projections, head and `<opt>`
       vector trained), with a test that only adapter, head and `<opt>` parameters change
-- [ ] `configs/lora.yaml`, run, results in `results/lora/`, trainable parameter count recorded
-- [ ] Question 5 answered in the README: full fine-tune against LoRA against head only
+- [x] `configs/lora.yaml`, run, results in `results/lora/`, trainable parameter count recorded
+- [ ] Question 5 answered in the README: full fine-tune against LoRA against head only (step H)
+
+Result (2026-10-14): in between, closer to full fine-tuning than to head only. 1,623,553
+trainable parameters (about 1% of the model), 3,750 steps in 16.8 minutes (60 examples per
+second, 9.9 GB). Mean accuracy on the six training datasets: head only 0.248, LoRA 0.454, full
+fine-tune (`poc`) 0.709; new labels 0.065, 0.279, 0.397. The per-dataset loss broke the plateau
+about 400 steps later than full fine-tuning (banking77 first again, around step 1,000 to 1,200),
+and was still falling at the end, so the shared schedule probably undertrains LoRA; a longer run
+or a higher adapter learning rate was not tried. Its biggest gaps are on the many-option datasets
+(banking77 0.141 against 0.480 with all 77 options, although its training loss on 2 to 16
+options reached 0.57) and on MNLI, which stayed at chance (0.349). Unseen task types: no signal
+(AUC 0.46 to 0.51).
 
 ### Step F: baselines (inference only, 2.5 h)
 

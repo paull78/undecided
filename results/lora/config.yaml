@@ -1,0 +1,41 @@
+name: lora
+backbone: answerdotai/ModernBERT-base
+seed: 0
+data:
+  train:
+    ag_news: 5000
+    emotion: 5000
+    banking77: 5000
+    trec: 5000
+    sst2: 5000
+    mnli: 5000
+  eval:
+    ag_news: 1000
+    emotion: 1000
+    banking77: 1000
+    trec: 500
+    sst2: 872
+    mnli: 1000
+    yahoo_answers: 1000
+    massive: 1000
+    tweet_irony: 784
+    sms_spam: 1000
+    tweet_hate: 1000
+    subjectivity: 1000
+train:
+  epochs: 2
+  batch_size: 16
+  head_lr: 0.001
+  encoder_lr: 3.0e-05
+  weight_decay: 0.01
+  warmup_ratio: 0.06
+  grad_clip: 1.0
+  max_length: 512
+  max_options: 16
+  augment: true
+  recast_rate: 0.0
+  freeze_encoder: false
+  lora_rank: 16
+  lora_lr: 0.0002
+  seed: 0
+  max_steps: null
